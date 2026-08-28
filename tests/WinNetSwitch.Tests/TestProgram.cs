@@ -112,7 +112,7 @@ internal static class TestProgram
         foreach (var script in mutationScripts)
         {
             TestAssert.DoesNotContain(maliciousName, script);
-            TestAssert.Contains("InterfaceGuid -eq $id", script);
+            TestAssert.Contains("[Guid]$_.InterfaceGuid -eq $id", script);
             TestAssert.Contains("-Confirm:$false", script);
         }
         TestAssert.Contains(WifiId.ToString("D"), mutationScripts[0]);

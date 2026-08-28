@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using WinNetSwitch.Core;
 using WinNetSwitch.Core.PowerShell;
 
@@ -46,6 +47,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _ = RefreshAdaptersAsync(showErrors: true);
         };
         startupTimer.Start();
+        AppLogger.Info("Tray context created.");
     }
 
     internal Task InitialRefreshCompleted => _initialRefreshCompleted.Task;
@@ -66,6 +68,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         _exiting = true;
+        AppLogger.Info("Tray exit requested.");
         _lifetimeSource.Cancel();
         _notifyIcon.Visible = false;
         base.ExitThreadCore();
@@ -112,11 +115,18 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         _busy = true;
+        AppLogger.Info("Refreshing physical adapter list.");
         RebuildMenu("Обновление списка…");
         string? statusAfterRefresh = null;
         try
         {
             _adapters = await _adapterService.GetPhysicalAdaptersAsync(_lifetimeSource.Token);
+            AppLogger.Info(
+                $"Adapter refresh completed. Count: {_adapters.Count}. " +
+                string.Join(
+                    "; ",
+                    _adapters.Select(adapter =>
+                        $"{adapter.Name} ({adapter.Id:D}): {adapter.Status}, enabled={adapter.IsEnabled}")));
         }
         catch (OperationCanceledException) when (_exiting)
         {
@@ -149,6 +159,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         _busy = true;
+        AppLogger.Info(
+            $"Exclusive switch requested: {adapter.Name} ({adapter.Id:D}), " +
+            $"current status={adapter.Status}, enabled={adapter.IsEnabled}.");
         RebuildMenu($"Переключение на «{adapter.Name}»…");
         string? statusAfterSwitch = null;
         try
@@ -156,6 +169,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _adapters = await _adapterService.SwitchExclusivelyAsync(
                 adapter.Id,
                 _lifetimeSource.Token);
+            AppLogger.Info(
+                $"Exclusive switch completed: {adapter.Name} ({adapter.Id:D}). " +
+                $"Enabled adapters: {string.Join(", ", _adapters.Where(item => item.IsEnabled).Select(item => item.Name))}.");
             ShowBalloon(
                 ToolTipIcon.Info,
                 "Сеть переключена",
@@ -192,6 +208,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         catch (Exception exception)
         {
+            AppLogger.Error("Failed to refresh adapter state after a switch error.", exception);
             return Shorten($"Состояние неизвестно: {exception.Message}", 100);
         }
     }
@@ -255,6 +272,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
         refreshItem.Click += async (_, _) => await RefreshAdaptersAsync(showErrors: true);
         _menu.Items.Add(refreshItem);
 
+        var openLogItem = new ToolStripMenuItem("Открыть лог ошибок")
+        {
+            Enabled = !_busy,
+        };
+        openLogItem.Click += (_, _) => OpenLog();
+        _menu.Items.Add(openLogItem);
+
         var exitItem = new ToolStripMenuItem("Выход");
         exitItem.Enabled = !_busy;
         exitItem.Click += (_, _) => ExitThread();
@@ -274,8 +298,31 @@ internal sealed class TrayApplicationContext : ApplicationContext
         return Shorten($"{adapter.Name} — {state}{speed}", 100);
     }
 
-    private void ShowError(string title, Exception exception) =>
-        ShowBalloon(ToolTipIcon.Error, title, exception.Message);
+    private void ShowError(string title, Exception exception)
+    {
+        AppLogger.Error(title, exception);
+        ShowBalloon(
+            ToolTipIcon.Error,
+            title,
+            $"{exception.Message}\nПодробности: {AppLogger.LogPath}");
+    }
+
+    private void OpenLog()
+    {
+        try
+        {
+            AppLogger.EnsureCreated();
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = AppLogger.LogPath,
+                UseShellExecute = true,
+            });
+        }
+        catch (Exception exception)
+        {
+            ShowError("Не удалось открыть лог", exception);
+        }
+    }
 
     private void ShowBalloon(ToolTipIcon icon, string title, string message)
     {

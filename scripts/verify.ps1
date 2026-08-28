@@ -11,6 +11,25 @@ $tests = Join-Path $projectRoot "tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csp
 $publishScript = Join-Path $PSScriptRoot "publish.ps1"
 $publishedExecutable = Join-Path $projectRoot "artifacts\publish\win-x64\WinNetSwitch.exe"
 
+function Invoke-PublishedAppMode {
+    param(
+        [Parameter(Mandatory = $true)]
+        [string]$Argument,
+
+        [Parameter(Mandatory = $true)]
+        [string]$Description
+    )
+
+    $process = Start-Process `
+        -FilePath $publishedExecutable `
+        -ArgumentList $Argument `
+        -Wait `
+        -PassThru
+    if ($process.ExitCode -ne 0) {
+        throw "$Description failed with exit code $($process.ExitCode)."
+    }
+}
+
 Push-Location $projectRoot
 try {
     & $DotNet restore $solution
@@ -33,18 +52,19 @@ try {
             throw "Smoke test requires an elevated PowerShell window. Re-run as administrator or use -SkipSmoke."
         }
 
-        & $publishedExecutable --probe-adapters
-        if ($LASTEXITCODE -ne 0) {
-            throw "Production adapter enumeration probe failed with exit code $LASTEXITCODE."
-        }
+        Invoke-PublishedAppMode `
+            -Argument "--logging-self-test" `
+            -Description "Diagnostic logging self-test"
+        Write-Host "Diagnostic logging self-test passed."
 
+        Invoke-PublishedAppMode `
+            -Argument "--probe-adapters" `
+            -Description "Production adapter enumeration probe"
         Write-Host "Production adapter enumeration probe passed without changing adapter state."
 
-        & $publishedExecutable --smoke-test
-        if ($LASTEXITCODE -ne 0) {
-            throw "Native tray smoke test failed with exit code $LASTEXITCODE."
-        }
-
+        Invoke-PublishedAppMode `
+            -Argument "--smoke-test" `
+            -Description "Native tray smoke test"
         Write-Host "Native tray smoke test passed without invoking the production network service."
     }
 }

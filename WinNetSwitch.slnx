@@ -1,0 +1,9 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/WinNetSwitch.App/WinNetSwitch.App.csproj" />
+    <Project Path="src/WinNetSwitch.Core/WinNetSwitch.Core.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/WinNetSwitch.Tests/WinNetSwitch.Tests.csproj" />
+  </Folder>
+</Solution>

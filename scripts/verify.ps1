@@ -10,6 +10,7 @@ $solution = Join-Path $projectRoot "WinNetSwitch.slnx"
 $tests = Join-Path $projectRoot "tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj"
 $publishScript = Join-Path $PSScriptRoot "publish.ps1"
 $publishedExecutable = Join-Path $projectRoot "artifacts\publish\win-x64\WinNetSwitch.exe"
+$setupExecutable = Join-Path $projectRoot "artifacts\setup\win-x64\WinNetSwitch-Setup.exe"
 
 function Invoke-PublishedAppMode {
     param(
@@ -66,6 +67,17 @@ try {
             -Argument "--smoke-test" `
             -Description "Native tray smoke test"
         Write-Host "Native tray smoke test passed without invoking the production network service."
+
+        $setupProcess = Start-Process `
+            -FilePath $setupExecutable `
+            -ArgumentList "--self-test" `
+            -Wait `
+            -PassThru
+        if ($setupProcess.ExitCode -ne 0) {
+            throw "Setup payload self-test failed with exit code $($setupProcess.ExitCode)."
+        }
+
+        Write-Host "Setup payload self-test passed."
     }
 }
 finally {

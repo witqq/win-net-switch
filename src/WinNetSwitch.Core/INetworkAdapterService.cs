@@ -5,7 +5,8 @@ public interface INetworkAdapterService
     Task<IReadOnlyList<PhysicalNetworkAdapter>> GetPhysicalAdaptersAsync(
         CancellationToken cancellationToken = default);
 
-    Task<IReadOnlyList<PhysicalNetworkAdapter>> SwitchExclusivelyAsync(
+    Task<IReadOnlyList<PhysicalNetworkAdapter>> SetAdapterEnabledAsync(
         Guid targetAdapterId,
+        bool enabled,
         CancellationToken cancellationToken = default);
 }

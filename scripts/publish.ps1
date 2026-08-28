@@ -9,6 +9,8 @@ $ErrorActionPreference = "Stop"
 $projectRoot = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $projectRoot "src\WinNetSwitch.App\WinNetSwitch.App.csproj"
 $output = Join-Path $projectRoot "artifacts\publish\$Runtime"
+$setupProject = Join-Path $projectRoot "src\WinNetSwitch.Setup\WinNetSwitch.Setup.csproj"
+$setupOutput = Join-Path $projectRoot "artifacts\setup\$Runtime"
 
 & $DotNet publish $project `
     --configuration Release `
@@ -30,3 +32,25 @@ if (-not (Test-Path -LiteralPath $executable -PathType Leaf)) {
 }
 
 Write-Host "Published: $executable"
+
+& $DotNet publish $setupProject `
+    --configuration Release `
+    --runtime $Runtime `
+    --self-contained true `
+    --output $setupOutput `
+    -p:PublishSingleFile=true `
+    -p:IncludeNativeLibrariesForSelfExtract=true `
+    -p:DebugType=None `
+    -p:DebugSymbols=false `
+    "-p:PayloadPath=$executable"
+
+if ($LASTEXITCODE -ne 0) {
+    throw "Setup publish failed with exit code $LASTEXITCODE."
+}
+
+$setupExecutable = Join-Path $setupOutput "WinNetSwitch-Setup.exe"
+if (-not (Test-Path -LiteralPath $setupExecutable -PathType Leaf)) {
+    throw "Setup executable was not created: $setupExecutable"
+}
+
+Write-Host "Setup: $setupExecutable"

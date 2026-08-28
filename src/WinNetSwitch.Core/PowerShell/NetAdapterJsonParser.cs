@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using System.Text.Json;
 
 namespace WinNetSwitch.Core.PowerShell;
@@ -34,9 +36,18 @@ internal static class NetAdapterJsonParser
 
     private static PhysicalNetworkAdapter ToAdapter(AdapterDto item)
     {
-        if (!Guid.TryParse(item.Id, out var id) || id == Guid.Empty)
+        var deviceInstanceId = string.IsNullOrWhiteSpace(item.DeviceInstanceId)
+            ? null
+            : item.DeviceInstanceId;
+        if ((!Guid.TryParse(item.Id, out var id) || id == Guid.Empty) && deviceInstanceId is not null)
         {
-            throw new NetworkSwitchException("Windows PowerShell вернул адаптер без корректного InterfaceGuid.");
+            id = CreateStableId(deviceInstanceId);
+        }
+
+        if (id == Guid.Empty)
+        {
+            throw new NetworkSwitchException(
+                "Windows PowerShell вернул адаптер без InterfaceGuid и PnP InstanceId.");
         }
 
         if (string.IsNullOrWhiteSpace(item.Name))
@@ -46,18 +57,28 @@ internal static class NetAdapterJsonParser
 
         return new PhysicalNetworkAdapter(
             id,
+            deviceInstanceId,
             item.InterfaceIndex,
             item.Name,
             item.Description ?? string.Empty,
             item.Status ?? "Unknown",
             item.MediaConnectionState ?? "Unknown",
             item.LinkSpeed ?? string.Empty,
-            item.IsEnabled);
+            item.IsEnabled,
+            WirelessRadio: null);
+    }
+
+    private static Guid CreateStableId(string deviceInstanceId)
+    {
+        var hash = SHA256.HashData(Encoding.UTF8.GetBytes(deviceInstanceId.ToUpperInvariant()));
+        return new Guid(hash.AsSpan(0, 16));
     }
 
     private sealed class AdapterDto
     {
         public string? Id { get; init; }
+
+        public string? DeviceInstanceId { get; init; }
 
         public int InterfaceIndex { get; init; }
 

@@ -6,11 +6,14 @@
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationHighDpiMode>PerMonitorV2</ApplicationHighDpiMode>
-    <AssemblyName>WinNetSwitch</AssemblyName>
-    <RootNamespace>WinNetSwitch.App</RootNamespace>
+    <AssemblyName>WinNetSwitch-Setup</AssemblyName>
+    <RootNamespace>WinNetSwitch.Setup</RootNamespace>
   </PropertyGroup>
   <ItemGroup>
-    <ProjectReference Include="../WinNetSwitch.Core/WinNetSwitch.Core.csproj" />
     <ProjectReference Include="../WinNetSwitch.Windows/WinNetSwitch.Windows.csproj" />
+    <EmbeddedResource
+      Include="$(PayloadPath)"
+      LogicalName="WinNetSwitch.Payload.exe"
+      Condition="'$(PayloadPath)' != '' and Exists('$(PayloadPath)')" />
   </ItemGroup>
 </Project>

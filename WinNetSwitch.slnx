@@ -2,6 +2,8 @@
   <Folder Name="/src/">
     <Project Path="src/WinNetSwitch.App/WinNetSwitch.App.csproj" />
     <Project Path="src/WinNetSwitch.Core/WinNetSwitch.Core.csproj" />
+    <Project Path="src/WinNetSwitch.Setup/WinNetSwitch.Setup.csproj" />
+    <Project Path="src/WinNetSwitch.Windows/WinNetSwitch.Windows.csproj" />
   </Folder>
   <Folder Name="/tests/">
     <Project Path="tests/WinNetSwitch.Tests/WinNetSwitch.Tests.csproj" />

@@ -10,11 +10,21 @@ internal sealed class FakePowerShellRunner : IPowerShellRunner
     private int _maximumConcurrentCalls;
 
     internal FakePowerShellRunner(params PhysicalNetworkAdapter[] adapters)
+        : this(operationLog: null, adapters)
+    {
+    }
+
+    internal FakePowerShellRunner(
+        List<string>? operationLog,
+        params PhysicalNetworkAdapter[] adapters)
     {
         Adapters = adapters.ToDictionary(adapter => adapter.Id);
+        OperationLog = operationLog;
     }
 
     internal Dictionary<Guid, PhysicalNetworkAdapter> Adapters { get; }
+
+    private List<string>? OperationLog { get; }
 
     internal List<string> Scripts { get; } = [];
 
@@ -54,6 +64,7 @@ internal sealed class FakePowerShellRunner : IPowerShellRunner
 
             if (script == NetAdapterScripts.ListPhysicalAdapters)
             {
+                OperationLog?.Add("powershell:list");
                 if (ListOutputOverride is not null)
                 {
                     return new PowerShellResult(0, ListOutputOverride, string.Empty);
@@ -63,6 +74,7 @@ internal sealed class FakePowerShellRunner : IPowerShellRunner
                     Adapters.Values.OrderBy(adapter => adapter.Name).Select(adapter => new
                     {
                         Id = adapter.Id.ToString("D"),
+                        adapter.DeviceInstanceId,
                         adapter.InterfaceIndex,
                         adapter.Name,
                         adapter.Description,
@@ -76,8 +88,11 @@ internal sealed class FakePowerShellRunner : IPowerShellRunner
 
             foreach (var adapter in Adapters.Values.ToArray())
             {
-                if (script == NetAdapterScripts.Enable(adapter.Id))
+                if (script == NetAdapterScripts.Enable(adapter.Id) ||
+                    (!string.IsNullOrWhiteSpace(adapter.DeviceInstanceId) &&
+                     script == NetAdapterScripts.EnablePnpDevice(adapter.DeviceInstanceId)))
                 {
+                    OperationLog?.Add($"powershell:enable:{adapter.Id:D}");
                     if (FailEnableFor == adapter.Id)
                     {
                         return new PowerShellResult(1, string.Empty, "enable failed");
@@ -99,6 +114,7 @@ internal sealed class FakePowerShellRunner : IPowerShellRunner
 
                 if (script == NetAdapterScripts.Disable(adapter.Id))
                 {
+                    OperationLog?.Add($"powershell:disable:{adapter.Id:D}");
                     if (FailDisableFor == adapter.Id)
                     {
                         return new PowerShellResult(1, string.Empty, "disable failed");

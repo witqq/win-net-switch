@@ -1,5 +1,6 @@
 using WinNetSwitch.Core;
 using WinNetSwitch.Core.PowerShell;
+using WinNetSwitch.Windows;
 
 namespace WinNetSwitch.App;
 
@@ -11,6 +12,12 @@ internal static class Program
     private static async Task<int> Main(string[] args)
     {
         ApplicationConfiguration.Initialize();
+        if (args.Length >= 2 &&
+            string.Equals(args[0], "--uninstall-worker", StringComparison.OrdinalIgnoreCase))
+        {
+            return await RunUninstallWorkerAsync(args);
+        }
+
         ConfigureUnhandledExceptionLogging();
         AppLogger.EnsureCreated();
         AppLogger.Info($"Application starting. Mode: {GetMode(args)}.");
@@ -41,6 +48,27 @@ internal static class Program
 
     private static async Task<int> RunAsync(string[] args)
     {
+        if (args.Length == 1 &&
+            (string.Equals(args[0], "--uninstall", StringComparison.OrdinalIgnoreCase) ||
+             string.Equals(args[0], "--uninstall-silent", StringComparison.OrdinalIgnoreCase)))
+        {
+            var silent = string.Equals(
+                args[0],
+                "--uninstall-silent",
+                StringComparison.OrdinalIgnoreCase);
+            if (!silent && MessageBox.Show(
+                    "Удалить WinNetSwitch, автозапуск и диагностические логи?",
+                    "Удаление WinNetSwitch",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question) != DialogResult.Yes)
+            {
+                return 0;
+            }
+
+            InstallationManager.BeginUninstall(silent);
+            return 0;
+        }
+
         if (args.Length == 1 &&
             string.Equals(args[0], "--smoke-test", StringComparison.OrdinalIgnoreCase))
         {
@@ -98,4 +126,40 @@ internal static class Program
 
     private static string GetMode(string[] args) =>
         args.Length == 0 ? "tray" : string.Join(' ', args);
+
+    private static async Task<int> RunUninstallWorkerAsync(string[] args)
+    {
+        try
+        {
+            if (!int.TryParse(args[1], out var parentProcessId))
+            {
+                return 2;
+            }
+
+            await InstallationManager.RunUninstallWorkerAsync(parentProcessId);
+            if (!args.Contains("--silent", StringComparer.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    "WinNetSwitch полностью удалён.",
+                    "Удаление завершено",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Information);
+            }
+
+            return 0;
+        }
+        catch (Exception exception)
+        {
+            if (!args.Contains("--silent", StringComparer.OrdinalIgnoreCase))
+            {
+                MessageBox.Show(
+                    $"Удаление не завершено: {exception.Message}",
+                    "Ошибка удаления",
+                    MessageBoxButtons.OK,
+                    MessageBoxIcon.Error);
+            }
+
+            return 1;
+        }
+    }
 }

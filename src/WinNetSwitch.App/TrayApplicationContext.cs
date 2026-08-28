@@ -126,7 +126,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 string.Join(
                     "; ",
                     _adapters.Select(adapter =>
-                        $"{adapter.Name} ({adapter.Id:D}): {adapter.Status}, enabled={adapter.IsEnabled}")));
+                        $"{adapter.Name} ({adapter.Id:D}): {adapter.Status}, " +
+                        $"adapter enabled={adapter.IsEnabled}, radio on={adapter.WirelessRadio?.IsOn}, " +
+                        $"active={adapter.IsActive}")));
         }
         catch (OperationCanceledException) when (_exiting)
         {
@@ -151,7 +153,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
     }
 
-    private async Task SwitchAdapterAsync(PhysicalNetworkAdapter adapter)
+    private async Task ToggleAdapterAsync(PhysicalNetworkAdapter adapter)
     {
         if (_busy || _exiting)
         {
@@ -159,38 +161,41 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         _busy = true;
+        var requestedState = !adapter.IsActive;
         AppLogger.Info(
-            $"Exclusive switch requested: {adapter.Name} ({adapter.Id:D}), " +
-            $"current status={adapter.Status}, enabled={adapter.IsEnabled}.");
-        RebuildMenu($"Переключение на «{adapter.Name}»…");
-        string? statusAfterSwitch = null;
+            $"Adapter toggle requested: {adapter.Name} ({adapter.Id:D}), " +
+            $"requested enabled={requestedState}, adapter enabled={adapter.IsEnabled}, " +
+            $"radio on={adapter.WirelessRadio?.IsOn}.");
+        RebuildMenu($"{(requestedState ? "Включение" : "Отключение")} «{adapter.Name}»…");
+        string? statusAfterToggle = null;
         try
         {
-            _adapters = await _adapterService.SwitchExclusivelyAsync(
+            _adapters = await _adapterService.SetAdapterEnabledAsync(
                 adapter.Id,
+                requestedState,
                 _lifetimeSource.Token);
             AppLogger.Info(
-                $"Exclusive switch completed: {adapter.Name} ({adapter.Id:D}). " +
-                $"Enabled adapters: {string.Join(", ", _adapters.Where(item => item.IsEnabled).Select(item => item.Name))}.");
+                $"Adapter toggle completed: {adapter.Name} ({adapter.Id:D}), " +
+                $"enabled={requestedState}.");
             ShowBalloon(
                 ToolTipIcon.Info,
-                "Сеть переключена",
-                $"Включён только физический адаптер «{adapter.Name}».");
+                "Состояние сети изменено",
+                $"Адаптер «{adapter.Name}» {StateWord(requestedState)}. Остальные адаптеры не изменялись.");
         }
         catch (OperationCanceledException) when (_exiting)
         {
         }
         catch (Exception exception)
         {
-            ShowError($"Не удалось переключиться на «{adapter.Name}»", exception);
-            statusAfterSwitch = await RefreshAfterFailureAsync();
+            ShowError($"Не удалось изменить «{adapter.Name}»", exception);
+            statusAfterToggle = await RefreshAfterFailureAsync();
         }
         finally
         {
             _busy = false;
             if (!_exiting)
             {
-                RebuildMenu(statusAfterSwitch, isError: statusAfterSwitch is not null);
+                RebuildMenu(statusAfterToggle, isError: statusAfterToggle is not null);
             }
         }
     }
@@ -222,7 +227,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             previousItem.Dispose();
         }
 
-        var heading = new ToolStripMenuItem("Выберите физический адаптер")
+        var heading = new ToolStripMenuItem("Нажмите, чтобы включить или выключить")
         {
             Enabled = false,
             Font = new Font(_menu.Font, FontStyle.Bold),
@@ -251,14 +256,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 var capturedAdapter = adapter;
                 var item = new ToolStripMenuItem(FormatAdapter(adapter))
                 {
-                    Checked = adapter.IsEnabled,
+                    Checked = adapter.IsActive,
                     CheckOnClick = false,
                     Enabled = !_busy,
                     ToolTipText = string.IsNullOrWhiteSpace(adapter.Description)
                         ? adapter.Name
                         : adapter.Description,
                 };
-                item.Click += async (_, _) => await SwitchAdapterAsync(capturedAdapter);
+                item.Click += async (_, _) => await ToggleAdapterAsync(capturedAdapter);
                 _menu.Items.Add(item);
             }
         }
@@ -290,6 +295,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var state = adapter switch
         {
             { IsEnabled: false } => "отключён",
+            { WirelessRadio.IsOn: false } => "адаптер включён, Wi-Fi выключен",
             { Status: "Up" } => "включён, подключён",
             { Status: "Disconnected" } => "включён, нет подключения",
             _ => $"включён, {adapter.Status}",
@@ -297,6 +303,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         var speed = string.IsNullOrWhiteSpace(adapter.LinkSpeed) ? string.Empty : $" · {adapter.LinkSpeed}";
         return Shorten($"{adapter.Name} — {state}{speed}", 100);
     }
+
+    private static string StateWord(bool enabled) => enabled ? "включён" : "отключён";
 
     private void ShowError(string title, Exception exception)
     {

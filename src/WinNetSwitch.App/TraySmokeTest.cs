@@ -58,22 +58,26 @@ internal static class TraySmokeTest
         [
             new(
                 Guid.Parse("11111111-1111-1111-1111-111111111111"),
+                null,
                 7,
                 "Wi-Fi",
                 "Smoke wireless adapter",
                 "Up",
                 "Connected",
                 "866.7 Mbps",
-                IsEnabled: true),
+                IsEnabled: true,
+                WirelessRadio: new WirelessRadioState(true, true, 1)),
             new(
                 Guid.Parse("22222222-2222-2222-2222-222222222222"),
+                null,
                 12,
                 "Ethernet",
                 "Smoke wired adapter",
                 "Disabled",
                 "Unknown",
                 "1 Gbps",
-                IsEnabled: false),
+                IsEnabled: false,
+                WirelessRadio: null),
         ];
 
         internal int SwitchCalls { get; private set; }
@@ -82,8 +86,9 @@ internal static class TraySmokeTest
             CancellationToken cancellationToken = default) =>
             Task.FromResult(Adapters);
 
-        public Task<IReadOnlyList<PhysicalNetworkAdapter>> SwitchExclusivelyAsync(
+        public Task<IReadOnlyList<PhysicalNetworkAdapter>> SetAdapterEnabledAsync(
             Guid targetAdapterId,
+            bool enabled,
             CancellationToken cancellationToken = default)
         {
             SwitchCalls++;

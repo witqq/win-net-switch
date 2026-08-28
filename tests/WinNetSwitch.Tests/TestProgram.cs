@@ -7,23 +7,23 @@ internal static class TestProgram
 {
     private static readonly Guid WifiId = Guid.Parse("11111111-1111-1111-1111-111111111111");
     private static readonly Guid EthernetId = Guid.Parse("22222222-2222-2222-2222-222222222222");
-    private static readonly Guid UsbEthernetId = Guid.Parse("33333333-3333-3333-3333-333333333333");
 
     internal static async Task<int> RunAsync()
     {
         var tests = new (string Name, Func<Task> Run)[]
         {
-            ("GetPhysicalAdapters parses PowerShell JSON", GetPhysicalAdaptersParsesJsonAsync),
+            ("Adapter list includes Wi-Fi radio state", AdapterListIncludesRadioStateAsync),
             ("Malformed PowerShell JSON is rejected", MalformedJsonIsRejectedAsync),
-            ("Mutation scripts use GUID and never adapter names", MutationScriptsUseGuidAsync),
-            ("Switch enables target before disabling other adapters", SwitchOrdersMutationsAsync),
-            ("Already exclusive target performs no mutation", AlreadyExclusiveTargetIsNoOpAsync),
+            ("Mutation scripts use typed GUID and never adapter names", MutationScriptsUseGuidAsync),
+            ("PnP mutation encodes device instance ID", PnpMutationEncodesDeviceIdAsync),
+            ("Enabling Ethernet leaves Wi-Fi unchanged", EnablingEthernetLeavesWifiUnchangedAsync),
+            ("Disabling Ethernet leaves Wi-Fi unchanged", DisablingEthernetLeavesWifiUnchangedAsync),
+            ("Enabled Wi-Fi adapter turns software radio on", EnabledWifiTurnsRadioOnAsync),
+            ("Disabled Wi-Fi adapter enables adapter then radio", DisabledWifiEnablesAdapterThenRadioAsync),
+            ("Disabling Wi-Fi turns radio off before adapter", DisablingWifiOrdersOperationsAsync),
+            ("Partial radio failure restores previous Wi-Fi radio state", RadioFailureRollsBackAsync),
             ("Missing target is rejected before mutations", MissingTargetIsRejectedAsync),
-            ("Multiple enabled competitors are all disabled", MultipleCompetitorsAreDisabledAsync),
-            ("Failed target enable leaves other adapters enabled", FailedEnablePreservesNetworkAsync),
-            ("Unconfirmed target enable leaves other adapters enabled", UnconfirmedEnablePreservesNetworkAsync),
-            ("Failed competitor disable restores initial state", FailedDisableRestoresInitialStateAsync),
-            ("Concurrent switches are serialized", ConcurrentSwitchesAreSerializedAsync),
+            ("Concurrent toggles are serialized", ConcurrentTogglesAreSerializedAsync),
         };
 
         var failures = new List<string>();
@@ -49,227 +49,255 @@ internal static class TestProgram
         return failures.Count == 0 ? 0 : 1;
     }
 
-    private static async Task GetPhysicalAdaptersParsesJsonAsync()
+    private static async Task AdapterListIncludesRadioStateAsync()
     {
-        var runner = CreateRunner(wifiEnabled: true, ethernetEnabled: false);
-        using var service = CreateService(runner);
+        var (runner, radio, service) = CreateService(
+            wifiAdapterEnabled: true,
+            wifiRadioEnabled: false,
+            ethernetEnabled: true);
+        using (service)
+        {
+            var adapters = await service.GetPhysicalAdaptersAsync();
+            var wifi = adapters.Single(adapter => adapter.Id == WifiId);
+            var ethernet = adapters.Single(adapter => adapter.Id == EthernetId);
 
-        var adapters = await service.GetPhysicalAdaptersAsync();
-
-        TestAssert.Equal(2, adapters.Count, "adapter count");
-        var wifi = adapters.Single(adapter => adapter.Id == WifiId);
-        var ethernet = adapters.Single(adapter => adapter.Id == EthernetId);
-        TestAssert.Equal("Wi-Fi", wifi.Name, "Wi-Fi adapter name");
-        TestAssert.True(wifi.IsEnabled, "Wi-Fi should be enabled");
-        TestAssert.False(ethernet.IsEnabled, "Ethernet should be disabled");
-    }
-
-    private static async Task SwitchOrdersMutationsAsync()
-    {
-        var runner = CreateRunner(wifiEnabled: false, ethernetEnabled: true);
-        using var service = CreateService(runner);
-
-        var result = await service.SwitchExclusivelyAsync(WifiId);
-
-        TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsEnabled, "Wi-Fi should be enabled");
-        TestAssert.False(
-            result.Single(adapter => adapter.Id == EthernetId).IsEnabled,
-            "Ethernet should be disabled");
-        var enablePosition = runner.Scripts.IndexOf(NetAdapterScripts.Enable(WifiId));
-        var disablePosition = runner.Scripts.IndexOf(NetAdapterScripts.Disable(EthernetId));
-        TestAssert.True(enablePosition >= 0, "target enable command should run");
-        TestAssert.True(
-            disablePosition > enablePosition,
-            "the other adapter must be disabled only after the target was enabled");
+            TestAssert.True(wifi.IsWireless, "Wi-Fi should be identified as wireless");
+            TestAssert.False(wifi.IsActive, "Wi-Fi should be inactive while software radio is off");
+            TestAssert.True(ethernet.IsActive, "Ethernet should be active");
+            TestAssert.Equal(0, radio.SetCalls.Count, "radio set call count");
+            TestAssert.Equal(2, runner.Adapters.Count, "raw adapter count");
+        }
     }
 
     private static async Task MalformedJsonIsRejectedAsync()
     {
-        var runner = CreateRunner(wifiEnabled: true, ethernetEnabled: false);
+        var (runner, _, service) = CreateService(true, true, true);
         runner.ListOutputOverride = "not-json";
-        using var service = CreateService(runner);
-
-        var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
-            () => service.GetPhysicalAdaptersAsync());
-
-        TestAssert.Contains("Не удалось разобрать", exception.Message);
+        using (service)
+        {
+            var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
+                () => service.GetPhysicalAdaptersAsync());
+            TestAssert.Contains("Не удалось разобрать", exception.Message);
+        }
     }
 
     private static async Task MutationScriptsUseGuidAsync()
     {
-        const string maliciousName = "Wi-Fi'; Disable-NetAdapter -Name *; #";
+        const string maliciousName = "Ethernet'; Disable-NetAdapter -Name *; #";
         var runner = new FakePowerShellRunner(
-            CreateAdapter(WifiId, maliciousName, enabled: false),
-            CreateAdapter(EthernetId, "Ethernet", enabled: true));
-        using var service = CreateService(runner);
+            CreateAdapter(EthernetId, maliciousName, enabled: false) with { DeviceInstanceId = null });
+        var radio = new FakeWirelessRadioController();
+        using var service = CreateService(runner, radio);
 
-        await service.SwitchExclusivelyAsync(WifiId);
+        await service.SetAdapterEnabledAsync(EthernetId, enabled: true);
 
-        var mutationScripts = runner.Scripts
-            .Where(script => script != NetAdapterScripts.ListPhysicalAdapters)
-            .ToArray();
-        TestAssert.Equal(2, mutationScripts.Length, "mutation command count");
-        foreach (var script in mutationScripts)
+        var mutation = runner.Scripts.Single(script => script != NetAdapterScripts.ListPhysicalAdapters);
+        TestAssert.DoesNotContain(maliciousName, mutation);
+        TestAssert.Contains("[Guid]$_.InterfaceGuid -eq $id", mutation);
+        TestAssert.Contains("-Confirm:$false", mutation);
+        TestAssert.Contains(EthernetId.ToString("D"), mutation);
+    }
+
+    private static async Task EnablingEthernetLeavesWifiUnchangedAsync()
+    {
+        var (runner, radio, service) = CreateService(true, true, false);
+        using (service)
         {
-            TestAssert.DoesNotContain(maliciousName, script);
-            TestAssert.Contains("[Guid]$_.InterfaceGuid -eq $id", script);
-            TestAssert.Contains("-Confirm:$false", script);
+            var result = await service.SetAdapterEnabledAsync(EthernetId, enabled: true);
+
+            TestAssert.True(result.Single(adapter => adapter.Id == EthernetId).IsActive, "Ethernet should be on");
+            TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should stay on");
+            TestAssert.False(
+                runner.Scripts.Contains(NetAdapterScripts.Disable(WifiId)),
+                "Wi-Fi must not be disabled");
+            TestAssert.Equal(0, radio.SetCalls.Count, "radio set call count");
         }
-        TestAssert.Contains(WifiId.ToString("D"), mutationScripts[0]);
-        TestAssert.Contains(EthernetId.ToString("D"), mutationScripts[1]);
     }
 
-    private static async Task AlreadyExclusiveTargetIsNoOpAsync()
+    private static async Task PnpMutationEncodesDeviceIdAsync()
     {
-        var runner = CreateRunner(wifiEnabled: true, ethernetEnabled: false);
-        using var service = CreateService(runner);
+        const string maliciousDeviceId = "PCI\\VEN_TEST'; Disable-PnpDevice -InstanceId '*'; #";
+        var adapter = CreateAdapter(WifiId, "Wi-Fi", enabled: false) with
+        {
+            DeviceInstanceId = maliciousDeviceId,
+        };
+        var runner = new FakePowerShellRunner(adapter);
+        var radio = new FakeWirelessRadioController(
+            null,
+            (WifiId, new WirelessRadioState(false, true, 1)));
+        using var service = CreateService(runner, radio);
 
-        var result = await service.SwitchExclusivelyAsync(WifiId);
+        await service.SetAdapterEnabledAsync(WifiId, enabled: true);
 
-        TestAssert.Equal(1, result.Count(adapter => adapter.IsEnabled), "enabled adapter count");
-        TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsEnabled, "Wi-Fi should stay enabled");
-        TestAssert.Equal(
-            0,
-            runner.Scripts.Count(script => script != NetAdapterScripts.ListPhysicalAdapters),
-            "mutation command count");
+        var mutation = runner.Scripts.Single(script => script != NetAdapterScripts.ListPhysicalAdapters);
+        TestAssert.DoesNotContain(maliciousDeviceId, mutation);
+        TestAssert.Contains("FromBase64String", mutation);
+        TestAssert.Contains("Enable-PnpDevice", mutation);
     }
 
-    private static async Task MultipleCompetitorsAreDisabledAsync()
+    private static async Task DisablingEthernetLeavesWifiUnchangedAsync()
     {
-        var runner = new FakePowerShellRunner(
-            CreateAdapter(WifiId, "Wi-Fi", enabled: true),
-            CreateAdapter(EthernetId, "Ethernet", enabled: true),
-            CreateAdapter(UsbEthernetId, "USB Ethernet", enabled: true));
-        using var service = CreateService(runner);
+        var (runner, radio, service) = CreateService(true, true, true);
+        using (service)
+        {
+            var result = await service.SetAdapterEnabledAsync(EthernetId, enabled: false);
 
-        var result = await service.SwitchExclusivelyAsync(WifiId);
+            TestAssert.False(result.Single(adapter => adapter.Id == EthernetId).IsActive, "Ethernet should be off");
+            TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should stay on");
+            TestAssert.False(
+                runner.Scripts.Contains(NetAdapterScripts.Disable(WifiId)),
+                "Wi-Fi must not be disabled");
+            TestAssert.Equal(0, radio.SetCalls.Count, "radio set call count");
+        }
+    }
 
-        TestAssert.Equal(1, result.Count(adapter => adapter.IsEnabled), "enabled adapter count");
-        TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsEnabled, "Wi-Fi should be enabled");
-        TestAssert.True(
-            runner.Scripts.Contains(NetAdapterScripts.Disable(EthernetId)),
-            "Ethernet disable command should run");
-        TestAssert.True(
-            runner.Scripts.Contains(NetAdapterScripts.Disable(UsbEthernetId)),
-            "USB Ethernet disable command should run");
+    private static async Task EnabledWifiTurnsRadioOnAsync()
+    {
+        var (runner, radio, service) = CreateService(true, false, true);
+        using (service)
+        {
+            var result = await service.SetAdapterEnabledAsync(WifiId, enabled: true);
+
+            TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should be active");
+            TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should stay enabled");
+            TestAssert.True(runner.Adapters[WifiId].IsEnabled, "Wi-Fi adapter should stay enabled");
+            TestAssert.True(
+                radio.SetCalls.Contains((WifiId, true)),
+                "software radio should be turned on");
+            TestAssert.Equal(
+                0,
+                runner.Scripts.Count(script => script != NetAdapterScripts.ListPhysicalAdapters),
+                "PowerShell mutation count");
+        }
+    }
+
+    private static async Task DisabledWifiEnablesAdapterThenRadioAsync()
+    {
+        var operations = new List<string>();
+        var (runner, radio, service) = CreateService(false, false, true, operations);
+        using (service)
+        {
+            var result = await service.SetAdapterEnabledAsync(WifiId, enabled: true);
+
+            TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should be active");
+            TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should stay enabled");
+            var enableIndex = operations.IndexOf($"powershell:enable:{WifiId:D}");
+            var radioIndex = operations.IndexOf($"radio:set:{WifiId:D}:True");
+            TestAssert.True(enableIndex >= 0, "adapter enable should run");
+            TestAssert.True(radioIndex > enableIndex, "radio should be enabled after the adapter");
+            TestAssert.True(radio.States[WifiId].IsOn, "software radio should be on");
+        }
+    }
+
+    private static async Task DisablingWifiOrdersOperationsAsync()
+    {
+        var operations = new List<string>();
+        var (runner, _, service) = CreateService(true, true, true, operations);
+        using (service)
+        {
+            var result = await service.SetAdapterEnabledAsync(WifiId, enabled: false);
+
+            TestAssert.False(result.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should be off");
+            TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should stay enabled");
+            var radioIndex = operations.IndexOf($"radio:set:{WifiId:D}:False");
+            var disableIndex = operations.IndexOf($"powershell:disable:{WifiId:D}");
+            TestAssert.True(radioIndex >= 0, "radio disable should run");
+            TestAssert.True(disableIndex > radioIndex, "adapter should be disabled after radio");
+        }
+    }
+
+    private static async Task RadioFailureRollsBackAsync()
+    {
+        var (runner, radio, service) = CreateService(true, false, true);
+        radio.FailSetFor = WifiId;
+        radio.MutateBeforeFailure = true;
+        radio.FailOnlyOnce = true;
+        using (service)
+        {
+            var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
+                () => service.SetAdapterEnabledAsync(WifiId, enabled: true));
+
+            TestAssert.Contains("Исходное состояние адаптера восстановлено", exception.Message);
+            TestAssert.True(runner.Adapters[WifiId].IsEnabled, "Wi-Fi adapter should keep its initial state");
+            TestAssert.False(radio.States[WifiId].SoftwareOn, "Wi-Fi radio should be rolled back to off");
+            TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should stay enabled");
+        }
     }
 
     private static async Task MissingTargetIsRejectedAsync()
     {
-        var runner = CreateRunner(wifiEnabled: true, ethernetEnabled: false);
-        using var service = CreateService(runner);
+        var (runner, _, service) = CreateService(true, true, true);
+        using (service)
+        {
+            var missingId = Guid.Parse("99999999-9999-9999-9999-999999999999");
+            var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
+                () => service.SetAdapterEnabledAsync(missingId, enabled: true));
 
-        var missingId = Guid.Parse("99999999-9999-9999-9999-999999999999");
-        var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
-            () => service.SwitchExclusivelyAsync(missingId));
-
-        TestAssert.Contains("больше не найден", exception.Message);
-        TestAssert.Equal(
-            0,
-            runner.Scripts.Count(script => script != NetAdapterScripts.ListPhysicalAdapters),
-            "mutation command count");
+            TestAssert.Contains("больше не найден", exception.Message);
+            TestAssert.Equal(
+                0,
+                runner.Scripts.Count(script => script != NetAdapterScripts.ListPhysicalAdapters),
+                "PowerShell mutation count");
+        }
     }
 
-    private static async Task FailedEnablePreservesNetworkAsync()
+    private static async Task ConcurrentTogglesAreSerializedAsync()
     {
-        var runner = CreateRunner(wifiEnabled: false, ethernetEnabled: true);
-        runner.FailEnableFor = WifiId;
-        using var service = CreateService(runner);
+        var (runner, _, service) = CreateService(true, true, true);
+        runner.RunDelay = TimeSpan.FromMilliseconds(15);
+        using (service)
+        {
+            var disableEthernet = service.SetAdapterEnabledAsync(EthernetId, enabled: false);
+            await runner.FirstCallStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
+            var disableWifi = service.SetAdapterEnabledAsync(WifiId, enabled: false);
+            await Task.WhenAll(disableEthernet, disableWifi);
 
-        var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
-            () => service.SwitchExclusivelyAsync(WifiId));
-
-        TestAssert.Contains("Исходное состояние адаптеров восстановлено", exception.Message);
-        TestAssert.False(runner.Adapters[WifiId].IsEnabled, "failed Wi-Fi enable must remain disabled");
-        TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet must remain enabled");
-        TestAssert.False(
-            runner.Scripts.Contains(NetAdapterScripts.Disable(EthernetId)),
-            "another adapter must not be disabled after target enable failed");
+            TestAssert.Equal(1, runner.MaximumConcurrentCalls, "maximum concurrent PowerShell calls");
+            TestAssert.False(runner.Adapters[EthernetId].IsEnabled, "Ethernet should be disabled");
+            TestAssert.False(runner.Adapters[WifiId].IsEnabled, "Wi-Fi should be disabled");
+        }
     }
 
-    private static async Task FailedDisableRestoresInitialStateAsync()
+    private static (
+        FakePowerShellRunner Runner,
+        FakeWirelessRadioController Radio,
+        PhysicalNetworkAdapterService Service) CreateService(
+            bool wifiAdapterEnabled,
+            bool wifiRadioEnabled,
+            bool ethernetEnabled,
+            List<string>? operations = null)
     {
         var runner = new FakePowerShellRunner(
-            CreateAdapter(WifiId, "Wi-Fi", enabled: false),
-            CreateAdapter(EthernetId, "Ethernet", enabled: true),
-            CreateAdapter(UsbEthernetId, "USB Ethernet", enabled: true));
-        runner.FailDisableFor = UsbEthernetId;
-        using var service = CreateService(runner);
-
-        var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
-            () => service.SwitchExclusivelyAsync(WifiId));
-
-        TestAssert.Contains("Исходное состояние адаптеров восстановлено", exception.Message);
-        TestAssert.False(runner.Adapters[WifiId].IsEnabled, "Wi-Fi should be rolled back to disabled");
-        TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should be restored");
-        TestAssert.True(runner.Adapters[UsbEthernetId].IsEnabled, "USB Ethernet should remain enabled");
+            operations,
+            CreateAdapter(WifiId, "Wi-Fi", wifiAdapterEnabled),
+            CreateAdapter(EthernetId, "Ethernet", ethernetEnabled));
+        var radio = new FakeWirelessRadioController(
+            operations,
+            (WifiId, new WirelessRadioState(wifiRadioEnabled, HardwareOn: true, PhysicalLayerCount: 1)));
+        return (runner, radio, CreateService(runner, radio));
     }
 
-    private static async Task UnconfirmedEnablePreservesNetworkAsync()
-    {
-        var runner = CreateRunner(wifiEnabled: false, ethernetEnabled: true);
-        runner.IgnoreEnableFor = WifiId;
-        using var service = CreateService(runner);
-
-        var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
-            () => service.SwitchExclusivelyAsync(WifiId));
-
-        TestAssert.Contains("Windows не подтвердила включение", exception.Message);
-        TestAssert.False(runner.Adapters[WifiId].IsEnabled, "Wi-Fi should remain disabled");
-        TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet must remain enabled");
-        TestAssert.False(
-            runner.Scripts.Contains(NetAdapterScripts.Disable(EthernetId)),
-            "another adapter must not be disabled before target enable is confirmed");
-    }
-
-    private static async Task ConcurrentSwitchesAreSerializedAsync()
-    {
-        var runner = CreateRunner(wifiEnabled: true, ethernetEnabled: false);
-        runner.RunDelay = TimeSpan.FromMilliseconds(15);
-        using var service = CreateService(runner);
-
-        var switchToEthernet = service.SwitchExclusivelyAsync(EthernetId);
-        await runner.FirstCallStarted.Task.WaitAsync(TimeSpan.FromSeconds(1));
-        var switchToWifi = service.SwitchExclusivelyAsync(WifiId);
-        await Task.WhenAll(switchToEthernet, switchToWifi);
-
-        TestAssert.Equal(1, runner.MaximumConcurrentCalls, "maximum concurrent PowerShell calls");
-        TestAssert.True(runner.Adapters[WifiId].IsEnabled, "second requested adapter should be enabled");
-        TestAssert.False(runner.Adapters[EthernetId].IsEnabled, "first requested adapter should be disabled");
-    }
-
-    private static FakePowerShellRunner CreateRunner(bool wifiEnabled, bool ethernetEnabled) =>
+    private static PhysicalNetworkAdapterService CreateService(
+        IPowerShellRunner runner,
+        IWirelessRadioController radio) =>
         new(
-            new PhysicalNetworkAdapter(
-                WifiId,
-                7,
-                "Wi-Fi",
-                "Wireless adapter",
-                wifiEnabled ? "Up" : "Disabled",
-                wifiEnabled ? "Connected" : "Unknown",
-                "866.7 Mbps",
-                wifiEnabled),
-            new PhysicalNetworkAdapter(
-                EthernetId,
-                12,
-                "Ethernet",
-                "Wired adapter",
-                ethernetEnabled ? "Up" : "Disabled",
-                ethernetEnabled ? "Connected" : "Unknown",
-                "1 Gbps",
-                ethernetEnabled));
-
-    private static PhysicalNetworkAdapterService CreateService(IPowerShellRunner runner) =>
-        new(runner, verificationAttempts: 1, verificationDelay: TimeSpan.Zero);
+            runner,
+            radio,
+            verificationAttempts: 1,
+            verificationDelay: TimeSpan.Zero);
 
     private static PhysicalNetworkAdapter CreateAdapter(Guid id, string name, bool enabled) =>
         new(
             id,
-            id == WifiId ? 7 : id == EthernetId ? 12 : 18,
+            id == WifiId
+                ? "PCI\\VEN_8086&DEV_TEST"
+                : "PCI\\VEN_10EC&DEV_TEST",
+            id == WifiId ? 7 : 12,
             name,
             $"{name} device",
             enabled ? "Up" : "Disabled",
             enabled ? "Connected" : "Unknown",
             id == WifiId ? "866.7 Mbps" : "1 Gbps",
-            enabled);
+            enabled,
+            WirelessRadio: null);
 }

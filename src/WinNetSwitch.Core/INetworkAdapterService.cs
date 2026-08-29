@@ -9,4 +9,8 @@ public interface INetworkAdapterService
         Guid targetAdapterId,
         bool enabled,
         CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PhysicalNetworkAdapter>> EnableOnlyAsync(
+        Guid targetAdapterId,
+        CancellationToken cancellationToken = default);
 }

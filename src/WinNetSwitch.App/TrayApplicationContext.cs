@@ -14,7 +14,9 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly Icon _trayIcon;
     private readonly NotifyIcon _notifyIcon;
     private IReadOnlyList<PhysicalNetworkAdapter> _adapters = [];
-    private bool _busy;
+    private bool _mutationInProgress;
+    private bool _refreshInProgress;
+    private long _stateVersion;
     private bool _disposed;
     private bool _exiting;
 
@@ -57,8 +59,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
     internal IReadOnlyList<TrayMenuItemSnapshot> GetMenuSnapshot() =>
         _menu.Items
             .OfType<ToolStripMenuItem>()
-            .Select(item => new TrayMenuItemSnapshot(item.Text ?? string.Empty, item.Checked, item.Enabled))
+            .Select(CreateSnapshot)
             .ToArray();
+
+    internal void BeginRefreshForSmoke() => _ = RefreshAdaptersAsync(showErrors: true);
 
     protected override void ExitThreadCore()
     {
@@ -93,7 +97,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void MenuOnOpening(object? sender, System.ComponentModel.CancelEventArgs eventArgs)
     {
-        if (!_busy)
+        if (!_mutationInProgress)
         {
             _ = RefreshAdaptersAsync(showErrors: true);
         }
@@ -101,7 +105,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void NotifyIconOnDoubleClick(object? sender, EventArgs eventArgs)
     {
-        if (!_busy)
+        if (!_mutationInProgress)
         {
             _ = RefreshAdaptersAsync(showErrors: true);
         }
@@ -109,23 +113,28 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private async Task RefreshAdaptersAsync(bool showErrors)
     {
-        if (_busy || _exiting)
+        if (_refreshInProgress || _exiting)
         {
             return;
         }
 
-        _busy = true;
+        _refreshInProgress = true;
+        var versionAtStart = _stateVersion;
         AppLogger.Info("Refreshing physical adapter list.");
         RebuildMenu("Обновление списка…");
         string? statusAfterRefresh = null;
         try
         {
-            _adapters = await _adapterService.GetPhysicalAdaptersAsync(_lifetimeSource.Token);
+            var refreshedAdapters = await _adapterService.GetPhysicalAdaptersAsync(_lifetimeSource.Token);
+            if (!_mutationInProgress && versionAtStart == _stateVersion)
+            {
+                _adapters = refreshedAdapters;
+            }
             AppLogger.Info(
-                $"Adapter refresh completed. Count: {_adapters.Count}. " +
+                $"Adapter refresh completed. Count: {refreshedAdapters.Count}. " +
                 string.Join(
                     "; ",
-                    _adapters.Select(adapter =>
+                    refreshedAdapters.Select(adapter =>
                         $"{adapter.Name} ({adapter.Id:D}): {adapter.Status}, " +
                         $"adapter enabled={adapter.IsEnabled}, radio on={adapter.WirelessRadio?.IsOn}, " +
                         $"active={adapter.IsActive}")));
@@ -143,8 +152,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         finally
         {
-            _busy = false;
-            if (!_exiting)
+            _refreshInProgress = false;
+            if (!_exiting && !_mutationInProgress)
             {
                 RebuildMenu(statusAfterRefresh, isError: statusAfterRefresh is not null);
             }
@@ -155,12 +164,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private async Task ToggleAdapterAsync(PhysicalNetworkAdapter adapter)
     {
-        if (_busy || _exiting)
+        if (_mutationInProgress || _exiting)
         {
             return;
         }
 
-        _busy = true;
+        _mutationInProgress = true;
+        _stateVersion++;
         var requestedState = !adapter.IsActive;
         AppLogger.Info(
             $"Adapter toggle requested: {adapter.Name} ({adapter.Id:D}), " +
@@ -174,6 +184,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 adapter.Id,
                 requestedState,
                 _lifetimeSource.Token);
+            _stateVersion++;
             AppLogger.Info(
                 $"Adapter toggle completed: {adapter.Name} ({adapter.Id:D}), " +
                 $"enabled={requestedState}.");
@@ -192,10 +203,54 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         finally
         {
-            _busy = false;
+            _mutationInProgress = false;
             if (!_exiting)
             {
                 RebuildMenu(statusAfterToggle, isError: statusAfterToggle is not null);
+            }
+        }
+    }
+
+    private async Task EnableOnlyAsync(PhysicalNetworkAdapter adapter)
+    {
+        if (_mutationInProgress || _exiting)
+        {
+            return;
+        }
+
+        _mutationInProgress = true;
+        _stateVersion++;
+        AppLogger.Info(
+            $"Exclusive adapter enable requested: {adapter.Name} ({adapter.Id:D}).");
+        RebuildMenu($"Включение только «{adapter.Name}»…");
+        string? statusAfterChange = null;
+        try
+        {
+            _adapters = await _adapterService.EnableOnlyAsync(
+                adapter.Id,
+                _lifetimeSource.Token);
+            _stateVersion++;
+            AppLogger.Info(
+                $"Exclusive adapter enable completed: {adapter.Name} ({adapter.Id:D}).");
+            ShowBalloon(
+                ToolTipIcon.Info,
+                "Состояние сети изменено",
+                $"Адаптер «{adapter.Name}» включён, остальные адаптеры отключены.");
+        }
+        catch (OperationCanceledException) when (_exiting)
+        {
+        }
+        catch (Exception exception)
+        {
+            ShowError($"Не удалось включить только «{adapter.Name}»", exception);
+            statusAfterChange = await RefreshAfterFailureAsync();
+        }
+        finally
+        {
+            _mutationInProgress = false;
+            if (!_exiting)
+            {
+                RebuildMenu(statusAfterChange, isError: statusAfterChange is not null);
             }
         }
     }
@@ -227,22 +282,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
             previousItem.Dispose();
         }
 
-        var heading = new ToolStripMenuItem("Нажмите, чтобы включить или выключить")
+        var heading = new ToolStripMenuItem("Сетевые адаптеры")
         {
             Enabled = false,
             Font = new Font(_menu.Font, FontStyle.Bold),
         };
         _menu.Items.Add(heading);
 
-        if (status is not null)
-        {
-            _menu.Items.Add(new ToolStripMenuItem(status)
-            {
-                Enabled = false,
-                ForeColor = isError ? Color.Firebrick : SystemColors.GrayText,
-            });
-        }
-        else if (_adapters.Count == 0)
+        if (_adapters.Count == 0 && status is null)
         {
             _menu.Items.Add(new ToolStripMenuItem("Физические адаптеры не найдены")
             {
@@ -253,25 +300,46 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             foreach (var adapter in _adapters)
             {
-                var capturedAdapter = adapter;
                 var item = new ToolStripMenuItem(FormatAdapter(adapter))
                 {
                     Checked = adapter.IsActive,
                     CheckOnClick = false,
-                    Enabled = !_busy,
                     ToolTipText = string.IsNullOrWhiteSpace(adapter.Description)
                         ? adapter.Name
                         : adapter.Description,
                 };
-                item.Click += async (_, _) => await ToggleAdapterAsync(capturedAdapter);
+
+                var capturedAdapter = adapter;
+                var toggleItem = new ToolStripMenuItem(adapter.IsActive ? "Выключить" : "Включить")
+                {
+                    Enabled = !_mutationInProgress,
+                };
+                toggleItem.Click += async (_, _) => await ToggleAdapterAsync(capturedAdapter);
+                item.DropDownItems.Add(toggleItem);
+
+                var enableOnlyItem = new ToolStripMenuItem("Включить только этот адаптер")
+                {
+                    Enabled = !_mutationInProgress,
+                };
+                enableOnlyItem.Click += async (_, _) => await EnableOnlyAsync(capturedAdapter);
+                item.DropDownItems.Add(enableOnlyItem);
                 _menu.Items.Add(item);
             }
+        }
+
+        if (status is not null)
+        {
+            _menu.Items.Add(new ToolStripMenuItem(status)
+            {
+                Enabled = false,
+                ForeColor = isError ? Color.Firebrick : SystemColors.GrayText,
+            });
         }
 
         _menu.Items.Add(new ToolStripSeparator());
         var refreshItem = new ToolStripMenuItem("Обновить")
         {
-            Enabled = !_busy,
+            Enabled = !_refreshInProgress && !_mutationInProgress,
             ShortcutKeyDisplayString = "двойной щелчок по значку",
         };
         refreshItem.Click += async (_, _) => await RefreshAdaptersAsync(showErrors: true);
@@ -279,13 +347,13 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         var openLogItem = new ToolStripMenuItem("Открыть лог ошибок")
         {
-            Enabled = !_busy,
+            Enabled = true,
         };
         openLogItem.Click += (_, _) => OpenLog();
         _menu.Items.Add(openLogItem);
 
         var exitItem = new ToolStripMenuItem("Выход");
-        exitItem.Enabled = !_busy;
+        exitItem.Enabled = true;
         exitItem.Click += (_, _) => ExitThread();
         _menu.Items.Add(exitItem);
     }
@@ -305,6 +373,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
     }
 
     private static string StateWord(bool enabled) => enabled ? "включён" : "отключён";
+
+    private static TrayMenuItemSnapshot CreateSnapshot(ToolStripMenuItem item) =>
+        new(
+            item.Text ?? string.Empty,
+            item.Checked,
+            item.Enabled,
+            item.DropDownItems
+                .OfType<ToolStripMenuItem>()
+                .Select(CreateSnapshot)
+                .ToArray());
 
     private void ShowError(string title, Exception exception)
     {
@@ -351,4 +429,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
             : string.Concat(value.AsSpan(0, maximumLength - 1), "…");
 }
 
-internal sealed record TrayMenuItemSnapshot(string Text, bool Checked, bool Enabled);
+internal sealed record TrayMenuItemSnapshot(
+    string Text,
+    bool Checked,
+    bool Enabled,
+    IReadOnlyList<TrayMenuItemSnapshot> Children);

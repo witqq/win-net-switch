@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using WinNetSwitch.Core.PowerShell;
 
 namespace WinNetSwitch.Core;
@@ -10,8 +11,11 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
     private readonly IPowerShellRunner _runner;
     private readonly IWirelessRadioController _wirelessRadioController;
     private readonly SemaphoreSlim _toggleLock = new(1, 1);
+    private readonly object _snapshotLock = new();
     private readonly int _verificationAttempts;
     private readonly TimeSpan _verificationDelay;
+    private AdapterSnapshot? _latestSnapshot;
+    private long _observationSequence;
     private bool _disposed;
 
     public PhysicalNetworkAdapterService(
@@ -40,6 +44,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
         CancellationToken cancellationToken = default)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        var observationSequence = Interlocked.Increment(ref _observationSequence);
         var result = await _runner
             .RunAsync(NetAdapterScripts.ListPhysicalAdapters, cancellationToken)
             .ConfigureAwait(false);
@@ -58,6 +63,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
             enrichedAdapters[index] = adapter with { WirelessRadio = radioState };
         }
 
+        PublishSnapshot(enrichedAdapters, observationSequence);
         return enrichedAdapters;
     }
 
@@ -73,15 +79,120 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
         }
 
         await _toggleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var initialTarget = GetRecentSnapshot()
+                ?.SingleOrDefault(adapter => adapter.Id == targetAdapterId);
+            return await SetAdapterEnabledCoreAsync(
+                    targetAdapterId,
+                    enabled,
+                    cancellationToken,
+                    initialTarget)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _toggleLock.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<PhysicalNetworkAdapter>> EnableOnlyAsync(
+        Guid targetAdapterId,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (targetAdapterId == Guid.Empty)
+        {
+            throw new ArgumentException("Adapter ID cannot be empty.", nameof(targetAdapterId));
+        }
+
+        await _toggleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<PhysicalNetworkAdapter>? initialState = null;
+        try
+        {
+            initialState = GetRecentSnapshot() ??
+                await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
+            var initialTarget = initialState.SingleOrDefault(adapter => adapter.Id == targetAdapterId)
+                ?? throw new NetworkSwitchException(
+                    $"Физический сетевой адаптер {targetAdapterId:D} больше не найден. Обновите список.");
+
+            var enabledState = await SetAdapterEnabledCoreAsync(
+                    initialTarget.Id,
+                    enabled: true,
+                    cancellationToken,
+                    initialTarget)
+                .ConfigureAwait(false);
+            var enabledTarget = enabledState.Single(
+                adapter => IsSameDevice(adapter, initialTarget));
+
+            var adaptersToDisable = enabledState
+                .Where(adapter => !IsSameDevice(adapter, enabledTarget) && adapter.IsEnabled)
+                .Select(adapter => adapter.Id)
+                .ToArray();
+            var currentState = enabledState;
+            foreach (var adapterId in adaptersToDisable)
+            {
+                var currentAdapter = currentState.Single(adapter => adapter.Id == adapterId);
+                currentState = await SetAdapterEnabledCoreAsync(
+                        currentAdapter.Id,
+                        enabled: false,
+                        cancellationToken,
+                        currentAdapter)
+                    .ConfigureAwait(false);
+            }
+
+            var finalState = currentState;
+            return finalState.Count(adapter => adapter.IsEnabled) == 1 &&
+                   finalState.Any(adapter => IsSameDevice(adapter, enabledTarget) && adapter.IsActive)
+                ? finalState
+                : throw new NetworkSwitchException(
+                    $"Windows не подтвердила, что «{initialTarget.Name}» — единственный включённый адаптер.");
+        }
+        catch (Exception exception) when (initialState is not null)
+        {
+            var rollbackErrors = new List<string>();
+            foreach (var adapter in initialState)
+            {
+                var rollbackError = await RestoreTargetStateAsync(adapter).ConfigureAwait(false);
+                if (rollbackError is not null)
+                {
+                    rollbackErrors.Add($"{adapter.Name}: {rollbackError}");
+                }
+            }
+
+            var rollbackStatus = rollbackErrors.Count == 0
+                ? "Исходные состояния адаптеров восстановлены."
+                : $"Восстановление завершилось с ошибками: {string.Join("; ", rollbackErrors)}";
+            throw new NetworkSwitchException(
+                $"Не удалось включить только выбранный адаптер. {rollbackStatus} Причина: {exception.Message}",
+                exception);
+        }
+        finally
+        {
+            _toggleLock.Release();
+        }
+    }
+
+    private async Task<IReadOnlyList<PhysicalNetworkAdapter>> SetAdapterEnabledCoreAsync(
+        Guid targetAdapterId,
+        bool enabled,
+        CancellationToken cancellationToken,
+        PhysicalNetworkAdapter? knownInitialTarget = null)
+    {
         PhysicalNetworkAdapter? initialTarget = null;
+        IReadOnlyList<PhysicalNetworkAdapter>? stateAfterAdapterEnable = null;
         var adapterStateChanged = false;
         var radioStateChanged = false;
         try
         {
-            var initialState = await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
-            initialTarget = initialState.SingleOrDefault(adapter => adapter.Id == targetAdapterId)
-                ?? throw new NetworkSwitchException(
-                    $"Физический сетевой адаптер {targetAdapterId:D} больше не найден. Обновите список.");
+            initialTarget = knownInitialTarget;
+            if (initialTarget is null)
+            {
+                var initialState = await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
+                initialTarget = initialState.SingleOrDefault(adapter => adapter.Id == targetAdapterId)
+                    ?? throw new NetworkSwitchException(
+                        $"Физический сетевой адаптер {targetAdapterId:D} больше не найден. Обновите список.");
+            }
 
             if (enabled)
             {
@@ -98,18 +209,18 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                         .ConfigureAwait(false);
                     adapterStateChanged = true;
 
-                    var enabledState = await WaitForStateAsync(
+                    stateAfterAdapterEnable = await WaitForStateAsync(
                         adapters => adapters.Any(
                                 adapter => IsSameDevice(adapter, initialTarget) && adapter.IsEnabled),
                             cancellationToken)
                         .ConfigureAwait(false);
-                    if (enabledState is null)
+                    if (stateAfterAdapterEnable is null)
                     {
                         throw new NetworkSwitchException(
                             $"Windows не подтвердила включение адаптера «{initialTarget.Name}».");
                     }
 
-                    targetAfterAdapterEnable = enabledState.Single(
+                    targetAfterAdapterEnable = stateAfterAdapterEnable.Single(
                         adapter => IsSameDevice(adapter, initialTarget));
                 }
 
@@ -123,6 +234,31 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                             enabled: true,
                             cancellationToken)
                         .ConfigureAwait(false);
+
+                    if (stateAfterAdapterEnable is not null)
+                    {
+                        var verifiedRadioState = await WaitForWirelessRadioStateAsync(
+                                targetAfterAdapterEnable.Id,
+                                enabled: true,
+                                cancellationToken)
+                            .ConfigureAwait(false);
+                        if (verifiedRadioState?.IsOn != true)
+                        {
+                            throw new NetworkSwitchException(
+                                $"Windows не подтвердила включение Wi-Fi radio для «{initialTarget.Name}». " +
+                                "Проверьте режим полёта или аппаратный переключатель беспроводной связи.");
+                        }
+
+                        var verifiedState = stateAfterAdapterEnable
+                            .Select(adapter => IsSameDevice(adapter, initialTarget)
+                                ? adapter with { WirelessRadio = verifiedRadioState }
+                                : adapter)
+                            .ToArray();
+                        PublishSnapshot(
+                            verifiedState,
+                            Interlocked.Increment(ref _observationSequence));
+                        return verifiedState;
+                    }
                 }
 
                 var finalState = await WaitForStateAsync(
@@ -180,10 +316,6 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                 $"Изменение состояния сети не завершено. {rollbackStatus} Причина: {exception.Message}",
                 exception);
         }
-        finally
-        {
-            _toggleLock.Release();
-        }
     }
 
     public void Dispose()
@@ -216,6 +348,31 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
         }
 
         return null;
+    }
+
+    private async Task<WirelessRadioState?> WaitForWirelessRadioStateAsync(
+        Guid interfaceId,
+        bool enabled,
+        CancellationToken cancellationToken)
+    {
+        WirelessRadioState? lastState = null;
+        for (var attempt = 0; attempt < _verificationAttempts; attempt++)
+        {
+            lastState = await _wirelessRadioController
+                .GetStateAsync(interfaceId, cancellationToken)
+                .ConfigureAwait(false);
+            if (lastState is not null && lastState.IsOn == enabled)
+            {
+                return lastState;
+            }
+
+            if (attempt + 1 < _verificationAttempts && _verificationDelay > TimeSpan.Zero)
+            {
+                await Task.Delay(_verificationDelay, cancellationToken).ConfigureAwait(false);
+            }
+        }
+
+        return lastState;
     }
 
     private async Task RunMutationAsync(
@@ -306,4 +463,36 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                 reference.DeviceInstanceId,
                 StringComparison.OrdinalIgnoreCase)
             : candidate.Id == reference.Id;
+
+    private IReadOnlyList<PhysicalNetworkAdapter>? GetRecentSnapshot()
+    {
+        lock (_snapshotLock)
+        {
+            return _latestSnapshot is not null &&
+                   Stopwatch.GetElapsedTime(_latestSnapshot.Timestamp) <= TimeSpan.FromSeconds(10)
+                ? _latestSnapshot.Adapters
+                : null;
+        }
+    }
+
+    private void PublishSnapshot(
+        IReadOnlyList<PhysicalNetworkAdapter> adapters,
+        long observationSequence)
+    {
+        lock (_snapshotLock)
+        {
+            if (_latestSnapshot is null || observationSequence >= _latestSnapshot.Sequence)
+            {
+                _latestSnapshot = new AdapterSnapshot(
+                    adapters.ToArray(),
+                    observationSequence,
+                    Stopwatch.GetTimestamp());
+            }
+        }
+    }
+
+    private sealed record AdapterSnapshot(
+        IReadOnlyList<PhysicalNetworkAdapter> Adapters,
+        long Sequence,
+        long Timestamp);
 }

@@ -24,6 +24,9 @@ internal static class TestProgram
             ("Partial radio failure restores previous Wi-Fi radio state", RadioFailureRollsBackAsync),
             ("Missing target is rejected before mutations", MissingTargetIsRejectedAsync),
             ("Concurrent toggles are serialized", ConcurrentTogglesAreSerializedAsync),
+            ("Recent adapter snapshot avoids a redundant pre-switch query", RecentSnapshotSpeedsUpSwitchAsync),
+            ("Enable-only disables every other adapter", EnableOnlyDisablesOtherAdaptersAsync),
+            ("Enable-only failure restores the initial state", EnableOnlyFailureRollsBackAsync),
         };
 
         var failures = new List<string>();
@@ -186,6 +189,15 @@ internal static class TestProgram
             TestAssert.True(enableIndex >= 0, "adapter enable should run");
             TestAssert.True(radioIndex > enableIndex, "radio should be enabled after the adapter");
             TestAssert.True(radio.States[WifiId].IsOn, "software radio should be on");
+            TestAssert.Equal(
+                2,
+                runner.Scripts.Count(script => script == NetAdapterScripts.ListPhysicalAdapters),
+                "adapter queries while enabling a disabled Wi-Fi adapter");
+
+            _ = await service.SetAdapterEnabledAsync(WifiId, enabled: false);
+            TestAssert.True(
+                radio.SetCalls.Contains((WifiId, false)),
+                "the verified radio state should be cached for the next switch");
         }
     }
 
@@ -255,6 +267,58 @@ internal static class TestProgram
             TestAssert.Equal(1, runner.MaximumConcurrentCalls, "maximum concurrent PowerShell calls");
             TestAssert.False(runner.Adapters[EthernetId].IsEnabled, "Ethernet should be disabled");
             TestAssert.False(runner.Adapters[WifiId].IsEnabled, "Wi-Fi should be disabled");
+        }
+    }
+
+    private static async Task RecentSnapshotSpeedsUpSwitchAsync()
+    {
+        var (runner, _, service) = CreateService(true, true, true);
+        using (service)
+        {
+            _ = await service.GetPhysicalAdaptersAsync();
+            runner.Scripts.Clear();
+
+            _ = await service.SetAdapterEnabledAsync(EthernetId, enabled: false);
+
+            TestAssert.Equal(
+                1,
+                runner.Scripts.Count(script => script == NetAdapterScripts.ListPhysicalAdapters),
+                "adapter queries during a switch with a recent snapshot");
+        }
+    }
+
+    private static async Task EnableOnlyDisablesOtherAdaptersAsync()
+    {
+        var (runner, _, service) = CreateService(true, true, true);
+        using (service)
+        {
+            var result = await service.EnableOnlyAsync(WifiId);
+
+            TestAssert.True(result.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should be active");
+            TestAssert.False(
+                result.Single(adapter => adapter.Id == EthernetId).IsEnabled,
+                "Ethernet should be disabled");
+            TestAssert.Equal(1, result.Count(adapter => adapter.IsEnabled), "enabled adapter count");
+            TestAssert.Equal(
+                3,
+                runner.Scripts.Count(script => script == NetAdapterScripts.ListPhysicalAdapters),
+                "adapter queries during enable-only");
+        }
+    }
+
+    private static async Task EnableOnlyFailureRollsBackAsync()
+    {
+        var (runner, radio, service) = CreateService(true, true, true);
+        runner.FailDisableFor = EthernetId;
+        using (service)
+        {
+            var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
+                () => service.EnableOnlyAsync(WifiId));
+
+            TestAssert.Contains("Исходные состояния адаптеров восстановлены", exception.Message);
+            TestAssert.True(runner.Adapters[WifiId].IsEnabled, "Wi-Fi adapter should be restored");
+            TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should be restored");
+            TestAssert.True(radio.States[WifiId].SoftwareOn, "Wi-Fi radio should be restored");
         }
     }
 

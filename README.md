@@ -1,6 +1,14 @@
 # WinNetSwitch
 
+[![CI](https://github.com/witqq/win-net-switch/actions/workflows/ci.yml/badge.svg)](https://github.com/witqq/win-net-switch/actions/workflows/ci.yml)
+[![GitHub release](https://img.shields.io/github/v/release/witqq/win-net-switch)](https://github.com/witqq/win-net-switch/releases/latest)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 WinNetSwitch — небольшое приложение для Windows 10/11, которое живёт в системном трее и позволяет управлять каждым **физическим** сетевым адаптером. Типичный сценарий — управлять Wi‑Fi и проводным Ethernet без открытия системных настроек.
+
+## Скачать
+
+Последняя готовая версия доступна на странице [GitHub Releases](https://github.com/witqq/win-net-switch/releases/latest). Для обычной установки скачайте `WinNetSwitch-Setup.exe`; файл `SHA256SUMS.txt` позволяет проверить целостность загрузки.
 
 ## Как работает переключение
 

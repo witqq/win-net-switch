@@ -1,0 +1,67 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build, test and package
+    runs-on: windows-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - name: Install .NET SDK
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6.0.0
+        with:
+          global-json-file: global.json
+
+      - name: Restore
+        run: dotnet restore .\WinNetSwitch.slnx
+
+      - name: Build
+        run: dotnet build .\WinNetSwitch.slnx --configuration Release --no-restore
+
+      - name: Test
+        run: dotnet run --project .\tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj --configuration Release --no-build
+
+      - name: Publish application and installer
+        shell: powershell
+        run: .\scripts\publish.ps1
+
+      - name: Create checksums
+        shell: powershell
+        run: |
+          $files = @(
+            'artifacts\publish\win-x64\WinNetSwitch.exe',
+            'artifacts\setup\win-x64\WinNetSwitch-Setup.exe'
+          )
+          $lines = foreach ($file in $files) {
+            $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant()
+            "$hash  $([IO.Path]::GetFileName($file))"
+          }
+          $lines | Set-Content -Encoding ascii -LiteralPath 'artifacts\SHA256SUMS.txt'
+
+      - name: Upload Windows artifacts
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: WinNetSwitch-win-x64
+          if-no-files-found: error
+          retention-days: 14
+          path: |
+            artifacts/publish/win-x64/WinNetSwitch.exe
+            artifacts/setup/win-x64/WinNetSwitch-Setup.exe
+            artifacts/SHA256SUMS.txt

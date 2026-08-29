@@ -16,6 +16,11 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private IReadOnlyList<PhysicalNetworkAdapter> _adapters = [];
     private bool _mutationInProgress;
     private bool _refreshInProgress;
+    private bool _menuOpen;
+    private bool _menuRebuildPending;
+    private string? _pendingMenuStatus;
+    private bool _pendingMenuStatusIsError;
+    private int _menuRevision;
     private long _stateVersion;
     private bool _disposed;
     private bool _exiting;
@@ -38,6 +43,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         };
 
         _menu.Opening += MenuOnOpening;
+        _menu.Closed += MenuOnClosed;
         _notifyIcon.DoubleClick += NotifyIconOnDoubleClick;
         RebuildMenu("Загрузка физических адаптеров…");
 
@@ -56,6 +62,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     internal bool IsTrayIconVisible => _notifyIcon.Visible;
 
+    internal bool IsRefreshInProgress => _refreshInProgress;
+
+    internal int MenuRevision => _menuRevision;
+
     internal IReadOnlyList<TrayMenuItemSnapshot> GetMenuSnapshot() =>
         _menu.Items
             .OfType<ToolStripMenuItem>()
@@ -63,6 +73,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
             .ToArray();
 
     internal void BeginRefreshForSmoke() => _ = RefreshAdaptersAsync(showErrors: true);
+
+    internal void BeginMenuSessionForSmoke() => _menuOpen = true;
+
+    internal void EndMenuSessionForSmoke() => CompleteMenuSession();
 
     protected override void ExitThreadCore()
     {
@@ -97,10 +111,30 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void MenuOnOpening(object? sender, System.ComponentModel.CancelEventArgs eventArgs)
     {
+        _menuOpen = true;
         if (!_mutationInProgress)
         {
             _ = RefreshAdaptersAsync(showErrors: true);
         }
+    }
+
+    private void MenuOnClosed(object? sender, ToolStripDropDownClosedEventArgs eventArgs) =>
+        CompleteMenuSession();
+
+    private void CompleteMenuSession()
+    {
+        _menuOpen = false;
+        if (!_menuRebuildPending || _exiting)
+        {
+            return;
+        }
+
+        var status = _pendingMenuStatus;
+        var isError = _pendingMenuStatusIsError;
+        _menuRebuildPending = false;
+        _pendingMenuStatus = null;
+        _pendingMenuStatusIsError = false;
+        RebuildMenu(status, isError);
     }
 
     private void NotifyIconOnDoubleClick(object? sender, EventArgs eventArgs)
@@ -121,7 +155,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _refreshInProgress = true;
         var versionAtStart = _stateVersion;
         AppLogger.Info("Refreshing physical adapter list.");
-        RebuildMenu("Обновление списка…");
+        RequestMenuRebuild("Обновление списка…");
         string? statusAfterRefresh = null;
         try
         {
@@ -155,7 +189,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _refreshInProgress = false;
             if (!_exiting && !_mutationInProgress)
             {
-                RebuildMenu(statusAfterRefresh, isError: statusAfterRefresh is not null);
+                RequestMenuRebuild(statusAfterRefresh, isError: statusAfterRefresh is not null);
             }
 
             _initialRefreshCompleted.TrySetResult();
@@ -176,7 +210,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             $"Adapter toggle requested: {adapter.Name} ({adapter.Id:D}), " +
             $"requested enabled={requestedState}, adapter enabled={adapter.IsEnabled}, " +
             $"radio on={adapter.WirelessRadio?.IsOn}.");
-        RebuildMenu($"{(requestedState ? "Включение" : "Отключение")} «{adapter.Name}»…");
+        RequestMenuRebuild($"{(requestedState ? "Включение" : "Отключение")} «{adapter.Name}»…");
         string? statusAfterToggle = null;
         try
         {
@@ -206,7 +240,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _mutationInProgress = false;
             if (!_exiting)
             {
-                RebuildMenu(statusAfterToggle, isError: statusAfterToggle is not null);
+                RequestMenuRebuild(statusAfterToggle, isError: statusAfterToggle is not null);
             }
         }
     }
@@ -222,7 +256,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _stateVersion++;
         AppLogger.Info(
             $"Exclusive adapter enable requested: {adapter.Name} ({adapter.Id:D}).");
-        RebuildMenu($"Включение только «{adapter.Name}»…");
+        RequestMenuRebuild($"Включение только «{adapter.Name}»…");
         string? statusAfterChange = null;
         try
         {
@@ -250,7 +284,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _mutationInProgress = false;
             if (!_exiting)
             {
-                RebuildMenu(statusAfterChange, isError: statusAfterChange is not null);
+                RequestMenuRebuild(statusAfterChange, isError: statusAfterChange is not null);
             }
         }
     }
@@ -275,6 +309,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void RebuildMenu(string? status = null, bool isError = false)
     {
+        _menuRevision++;
         var previousItems = _menu.Items.Cast<ToolStripItem>().ToArray();
         _menu.Items.Clear();
         foreach (var previousItem in previousItems)
@@ -356,6 +391,19 @@ internal sealed class TrayApplicationContext : ApplicationContext
         exitItem.Enabled = true;
         exitItem.Click += (_, _) => ExitThread();
         _menu.Items.Add(exitItem);
+    }
+
+    private void RequestMenuRebuild(string? status = null, bool isError = false)
+    {
+        if (_menuOpen)
+        {
+            _menuRebuildPending = true;
+            _pendingMenuStatus = status;
+            _pendingMenuStatusIsError = isError;
+            return;
+        }
+
+        RebuildMenu(status, isError);
     }
 
     private static string FormatAdapter(PhysicalNetworkAdapter adapter)

@@ -12,7 +12,8 @@ internal static class TraySmokeTest
         using var timeoutTimer = new System.Windows.Forms.Timer { Interval = 50 };
         var stopwatch = Stopwatch.StartNew();
         var exitCode = 1;
-        var refreshStarted = false;
+        var phase = 0;
+        var revisionBeforeRefresh = 0;
 
         timeoutTimer.Tick += (_, _) =>
         {
@@ -35,11 +36,13 @@ internal static class TraySmokeTest
             var hasRefresh = menu.Any(item => item.Text == "Обновить" && item.Enabled);
             var hasExit = menu.Any(item => item.Text == "Выход" && item.Enabled);
 
-            if (!refreshStarted)
+            if (phase == 0)
             {
                 service.BlockNextRefresh();
+                context.BeginMenuSessionForSmoke();
+                revisionBeforeRefresh = context.MenuRevision;
                 context.BeginRefreshForSmoke();
-                refreshStarted = true;
+                phase = 1;
                 return;
             }
 
@@ -52,17 +55,39 @@ internal static class TraySmokeTest
                 ethernet.Children.Any(item => item.Text == "Включить" && item.Enabled) &&
                 ethernet.Children.Any(item => item.Text == "Включить только этот адаптер" && item.Enabled);
 
-            if (context.IsTrayIconVisible &&
+            if (phase == 1 &&
+                context.IsTrayIconVisible &&
                 Application.OpenForms.Count == 0 &&
                 refreshIsPending &&
-                hasRefreshStatus &&
+                !hasRefreshStatus &&
                 wifiActionsAvailable &&
                 ethernetActionsAvailable &&
-                !hasRefresh &&
+                hasRefresh &&
                 hasExit &&
+                context.MenuRevision == revisionBeforeRefresh &&
                 service.SwitchCalls == 0)
             {
-                exitCode = 0;
+                service.CompletePendingRefresh();
+                phase = 2;
+                return;
+            }
+
+            if (phase == 2 && !context.IsRefreshInProgress)
+            {
+                var stayedStableWhileOpen = context.MenuRevision == revisionBeforeRefresh;
+                context.EndMenuSessionForSmoke();
+                if (stayedStableWhileOpen && context.MenuRevision > revisionBeforeRefresh)
+                {
+                    exitCode = 0;
+                }
+
+                context.ExitThread();
+                return;
+            }
+
+            if (stopwatch.Elapsed < TimeSpan.FromSeconds(5))
+            {
+                return;
             }
 
             service.CompletePendingRefresh();

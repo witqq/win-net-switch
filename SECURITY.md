@@ -1,11 +1,13 @@
-# Политика безопасности
+# Security Policy
 
-## Поддерживаемая версия
+**English** | [Русский](SECURITY.ru.md)
 
-Исправления безопасности выпускаются для последней опубликованной версии WinNetSwitch.
+## Supported version
 
-## Сообщение об уязвимости
+Security fixes are provided for the latest published version of WinNetSwitch.
 
-Не публикуйте сведения об уязвимости в обычной GitHub Issue. Используйте приватную форму [GitHub Security Advisory](https://github.com/witqq/win-net-switch/security/advisories/new).
+## Reporting a vulnerability
 
-Укажите затронутую версию, условия воспроизведения, ожидаемое влияние и минимальный пример, если его можно предоставить без раскрытия чужих данных. Не включайте реальные пароли, токены, адреса или диагностические логи без предварительного удаления персональных сведений.
+Do not disclose vulnerability details in a public GitHub issue. Use a private [GitHub Security Advisory](https://github.com/witqq/win-net-switch/security/advisories/new).
+
+Include the affected version, reproduction conditions, expected impact, and a minimal example when it can be shared without exposing other people's data. Do not include real passwords, tokens, addresses, or diagnostic logs without first removing personal information.

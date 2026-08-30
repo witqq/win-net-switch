@@ -80,7 +80,7 @@ internal static class TestProgram
         {
             var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
                 () => service.GetPhysicalAdaptersAsync());
-            TestAssert.Contains("Не удалось разобрать", exception.Message);
+            TestAssert.Contains("Could not parse", exception.Message);
         }
     }
 
@@ -229,7 +229,7 @@ internal static class TestProgram
             var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
                 () => service.SetAdapterEnabledAsync(WifiId, enabled: true));
 
-            TestAssert.Contains("Исходное состояние адаптера восстановлено", exception.Message);
+            TestAssert.Contains("The original adapter state was restored", exception.Message);
             TestAssert.True(runner.Adapters[WifiId].IsEnabled, "Wi-Fi adapter should keep its initial state");
             TestAssert.False(radio.States[WifiId].SoftwareOn, "Wi-Fi radio should be rolled back to off");
             TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should stay enabled");
@@ -245,7 +245,7 @@ internal static class TestProgram
             var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
                 () => service.SetAdapterEnabledAsync(missingId, enabled: true));
 
-            TestAssert.Contains("больше не найден", exception.Message);
+            TestAssert.Contains("is no longer available", exception.Message);
             TestAssert.Equal(
                 0,
                 runner.Scripts.Count(script => script != NetAdapterScripts.ListPhysicalAdapters),
@@ -315,7 +315,7 @@ internal static class TestProgram
             var exception = await TestAssert.ThrowsAsync<NetworkSwitchException>(
                 () => service.EnableOnlyAsync(WifiId));
 
-            TestAssert.Contains("Исходные состояния адаптеров восстановлены", exception.Message);
+            TestAssert.Contains("The original adapter states were restored", exception.Message);
             TestAssert.True(runner.Adapters[WifiId].IsEnabled, "Wi-Fi adapter should be restored");
             TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should be restored");
             TestAssert.True(radio.States[WifiId].SoftwareOn, "Wi-Fi radio should be restored");

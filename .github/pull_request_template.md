@@ -1,13 +1,13 @@
-## Что изменено
+## What changed
 
-Опишите пользовательский результат и причину изменения.
+Describe the user-visible outcome and the reason for the change.
 
-## Проверка
+## Verification
 
-Укажите точные команды и результаты.
+List the exact commands and results.
 
-- [ ] Release-сборка прошла без ошибок и предупреждений.
-- [ ] Связанные тесты добавлены или обновлены и проходят.
-- [ ] Документация соответствует фактическому поведению кода.
-- [ ] Изменение не добавляет секреты, реальные сетевые идентификаторы, пользовательские пути или диагностические логи.
-- [ ] Для изменения сетевого состояния сохранены итоговая проверка и откат при частичной ошибке.
+- [ ] The Release build completes without errors or warnings.
+- [ ] Relevant tests were added or updated and pass.
+- [ ] Documentation matches the behavior implemented in code.
+- [ ] The change adds no secrets, real network identifiers, user-specific paths, or diagnostic logs.
+- [ ] Network-state changes retain final-state verification and rollback after partial failure.

@@ -1,0 +1,82 @@
+name: Сообщить об ошибке (Русский)
+description: Воспроизводимая проблема в установленной или переносимой версии WinNetSwitch
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Спасибо за сообщение. Не публикуйте пароли, токены, MAC-адреса, имена Wi-Fi-сетей и другие персональные сведения. Об уязвимостях сообщайте через GitHub Security Advisory.
+  - type: input
+    id: version
+    attributes:
+      label: Версия WinNetSwitch
+      description: Версия указана на странице установленного приложения или GitHub Release.
+      placeholder: 1.3.0
+    validations:
+      required: true
+  - type: input
+    id: windows
+    attributes:
+      label: Версия Windows
+      placeholder: Windows 11 24H2, build 26100
+    validations:
+      required: true
+  - type: dropdown
+    id: distribution
+    attributes:
+      label: Способ запуска
+      options:
+        - Установщик WinNetSwitch-Setup.exe
+        - Переносимый WinNetSwitch.exe
+        - Локальная сборка из исходников
+    validations:
+      required: true
+  - type: textarea
+    id: adapters
+    attributes:
+      label: Затронутые адаптеры
+      description: Укажите типы адаптеров и их модели без MAC/IP-адресов и имён Wi-Fi-сетей.
+      placeholder: Встроенный Intel Wi-Fi и проводной Realtek Ethernet
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Шаги воспроизведения
+      placeholder: |
+        1. Открыть tray-меню
+        2. Выбрать ...
+        3. Наблюдать ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Ожидаемый результат
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Фактический результат
+    validations:
+      required: true
+  - type: textarea
+    id: log
+    attributes:
+      label: Обезличенный фрагмент лога
+      description: Лог находится в %LOCALAPPDATA%\WinNetSwitch\logs. Удалите персональные и сетевые идентификаторы перед публикацией.
+      render: text
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Проверки
+      options:
+        - label: Я использую последнюю опубликованную версию.
+          required: true
+        - label: Я проверил существующие Issues и не нашёл дубликат.
+          required: true
+        - label: В сообщении и логе нет секретов или персональных данных.
+          required: true

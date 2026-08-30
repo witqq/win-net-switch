@@ -53,7 +53,7 @@ internal static class NetAdapterScripts
             $"$id=[Guid]'{id}';" +
             "$items=@(Get-NetAdapter -Name * -Physical -ErrorAction Stop |" +
             "Where-Object {[Guid]$_.InterfaceGuid -eq $id});" +
-            "if($items.Count -ne 1){throw \"Физический сетевой адаптер $id не найден.\"};" +
+            "if($items.Count -ne 1){throw \"Physical network adapter $id was not found.\"};" +
             $"$items[0] | {command} -Confirm:$false -ErrorAction Stop;";
     }
 }

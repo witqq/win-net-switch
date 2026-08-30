@@ -26,8 +26,8 @@ internal static class Program
             }
 
             if (!silent && MessageBox.Show(
-                    "Установить WinNetSwitch и включить автозапуск при входе в Windows?",
-                    "Установка WinNetSwitch",
+                    "Install WinNetSwitch and start it automatically when you sign in to Windows?",
+                    "Install WinNetSwitch",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question) != DialogResult.Yes)
             {
@@ -59,8 +59,8 @@ internal static class Program
             if (!silent)
             {
                 MessageBox.Show(
-                    "WinNetSwitch установлен, добавлен в автозапуск и запущен в системном трее.",
-                    "Установка завершена",
+                    "WinNetSwitch has been installed, added to startup, and launched in the system tray.",
+                    "Installation complete",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
@@ -73,8 +73,8 @@ internal static class Program
             if (!silent)
             {
                 MessageBox.Show(
-                    $"Установка не завершена: {exception.Message}",
-                    "Ошибка установки",
+                    $"Installation failed: {exception.Message}",
+                    "Installation error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }
@@ -86,7 +86,7 @@ internal static class Program
     private static Stream OpenPayload() =>
         Assembly.GetExecutingAssembly().GetManifestResourceStream(PayloadResourceName)
         ?? throw new InvalidOperationException(
-            "Установщик не содержит WinNetSwitch.exe. Соберите setup через scripts/publish.ps1.");
+            "The installer does not contain WinNetSwitch.exe. Build it through scripts/publish.ps1.");
 
     private static void WriteLog(string message)
     {

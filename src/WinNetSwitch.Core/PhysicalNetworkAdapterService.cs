@@ -48,7 +48,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
         var result = await _runner
             .RunAsync(NetAdapterScripts.ListPhysicalAdapters, cancellationToken)
             .ConfigureAwait(false);
-        EnsureCommandSucceeded(result, "получить список физических сетевых адаптеров");
+        EnsureCommandSucceeded(result, "retrieve the physical network adapter list");
 
         var adapters = NetAdapterJsonParser.Parse(result.StandardOutput);
         var enrichedAdapters = new PhysicalNetworkAdapter[adapters.Count];
@@ -114,7 +114,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                 await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
             var initialTarget = initialState.SingleOrDefault(adapter => adapter.Id == targetAdapterId)
                 ?? throw new NetworkSwitchException(
-                    $"Физический сетевой адаптер {targetAdapterId:D} больше не найден. Обновите список.");
+                    $"Physical network adapter {targetAdapterId:D} is no longer available. Refresh the list.");
 
             var enabledState = await SetAdapterEnabledCoreAsync(
                     initialTarget.Id,
@@ -146,7 +146,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                    finalState.Any(adapter => IsSameDevice(adapter, enabledTarget) && adapter.IsActive)
                 ? finalState
                 : throw new NetworkSwitchException(
-                    $"Windows не подтвердила, что «{initialTarget.Name}» — единственный включённый адаптер.");
+                    $"Windows did not confirm that “{initialTarget.Name}” is the only enabled adapter.");
         }
         catch (Exception exception) when (initialState is not null)
         {
@@ -161,10 +161,10 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
             }
 
             var rollbackStatus = rollbackErrors.Count == 0
-                ? "Исходные состояния адаптеров восстановлены."
-                : $"Восстановление завершилось с ошибками: {string.Join("; ", rollbackErrors)}";
+                ? "The original adapter states were restored."
+                : $"Restoration completed with errors: {string.Join("; ", rollbackErrors)}";
             throw new NetworkSwitchException(
-                $"Не удалось включить только выбранный адаптер. {rollbackStatus} Причина: {exception.Message}",
+                $"Could not enable only the selected adapter. {rollbackStatus} Cause: {exception.Message}",
                 exception);
         }
         finally
@@ -191,7 +191,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                 var initialState = await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
                 initialTarget = initialState.SingleOrDefault(adapter => adapter.Id == targetAdapterId)
                     ?? throw new NetworkSwitchException(
-                        $"Физический сетевой адаптер {targetAdapterId:D} больше не найден. Обновите список.");
+                        $"Physical network adapter {targetAdapterId:D} is no longer available. Refresh the list.");
             }
 
             if (enabled)
@@ -204,7 +204,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                         : NetAdapterScripts.EnablePnpDevice(initialTarget.DeviceInstanceId);
                     await RunMutationAsync(
                             enableScript,
-                            $"включить адаптер «{initialTarget.Name}»",
+                            $"enable adapter “{initialTarget.Name}”",
                             cancellationToken)
                         .ConfigureAwait(false);
                     adapterStateChanged = true;
@@ -217,7 +217,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                     if (stateAfterAdapterEnable is null)
                     {
                         throw new NetworkSwitchException(
-                            $"Windows не подтвердила включение адаптера «{initialTarget.Name}».");
+                            $"Windows did not confirm that adapter “{initialTarget.Name}” was enabled.");
                     }
 
                     targetAfterAdapterEnable = stateAfterAdapterEnable.Single(
@@ -245,8 +245,8 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                         if (verifiedRadioState?.IsOn != true)
                         {
                             throw new NetworkSwitchException(
-                                $"Windows не подтвердила включение Wi-Fi radio для «{initialTarget.Name}». " +
-                                "Проверьте режим полёта или аппаратный переключатель беспроводной связи.");
+                                $"Windows did not confirm that the Wi-Fi radio for “{initialTarget.Name}” was enabled. " +
+                                "Check airplane mode and the hardware wireless switch.");
                         }
 
                         var verifiedState = stateAfterAdapterEnable
@@ -268,9 +268,9 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                     .ConfigureAwait(false);
                 return finalState ?? throw new NetworkSwitchException(
                     isWireless
-                        ? $"Windows не подтвердила включение Wi-Fi radio для «{initialTarget.Name}». " +
-                          "Проверьте режим полёта или аппаратный переключатель беспроводной связи."
-                        : $"Windows не подтвердила включение адаптера «{initialTarget.Name}».");
+                        ? $"Windows did not confirm that the Wi-Fi radio for “{initialTarget.Name}” was enabled. " +
+                          "Check airplane mode and the hardware wireless switch."
+                        : $"Windows did not confirm that adapter “{initialTarget.Name}” was enabled.");
             }
 
             if (initialTarget.WirelessRadio is not null && initialTarget.WirelessRadio.SoftwareOn)
@@ -285,7 +285,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
             {
                 await RunMutationAsync(
                         NetAdapterScripts.Disable(initialTarget.Id),
-                        $"отключить адаптер «{initialTarget.Name}»",
+                        $"disable adapter “{initialTarget.Name}”",
                         cancellationToken)
                     .ConfigureAwait(false);
                 adapterStateChanged = true;
@@ -297,15 +297,15 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                     cancellationToken)
                 .ConfigureAwait(false);
             return disabledState ?? throw new NetworkSwitchException(
-                $"Windows не подтвердила отключение адаптера «{initialTarget.Name}».");
+                $"Windows did not confirm that adapter “{initialTarget.Name}” was disabled.");
         }
         catch (Exception exception) when (
             initialTarget is not null && (adapterStateChanged || radioStateChanged))
         {
             var rollbackError = await RestoreTargetStateAsync(initialTarget).ConfigureAwait(false);
             var rollbackStatus = rollbackError is null
-                ? "Исходное состояние адаптера восстановлено."
-                : $"Не удалось полностью восстановить исходное состояние: {rollbackError}";
+                ? "The original adapter state was restored."
+                : $"The original state could not be fully restored: {rollbackError}";
 
             if (exception is OperationCanceledException && rollbackError is null)
             {
@@ -313,7 +313,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
             }
 
             throw new NetworkSwitchException(
-                $"Изменение состояния сети не завершено. {rollbackStatus} Причина: {exception.Message}",
+                $"The network state change did not complete. {rollbackStatus} Cause: {exception.Message}",
                 exception);
         }
     }
@@ -392,7 +392,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
             var currentTarget = currentState.SingleOrDefault(
                     adapter => IsSameDevice(adapter, initialTarget))
                 ?? throw new NetworkSwitchException(
-                    $"Адаптер «{initialTarget.Name}» исчез во время восстановления.");
+                    $"Adapter “{initialTarget.Name}” disappeared during restoration.");
 
             if (initialTarget.IsEnabled && !currentTarget.IsEnabled)
             {
@@ -400,7 +400,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                         string.IsNullOrWhiteSpace(initialTarget.DeviceInstanceId)
                             ? NetAdapterScripts.Enable(initialTarget.Id)
                             : NetAdapterScripts.EnablePnpDevice(initialTarget.DeviceInstanceId),
-                        $"восстановить адаптер «{initialTarget.Name}»",
+                        $"restore adapter “{initialTarget.Name}”",
                         CancellationToken.None)
                     .ConfigureAwait(false);
             }
@@ -421,7 +421,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
             {
                 await RunMutationAsync(
                         NetAdapterScripts.Disable(currentTarget.Id),
-                        $"восстановить отключённое состояние адаптера «{initialTarget.Name}»",
+                        $"restore the disabled state of adapter “{initialTarget.Name}”",
                         CancellationToken.None)
                     .ConfigureAwait(false);
             }
@@ -432,7 +432,7 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                 restoredTarget.WirelessRadio?.SoftwareOn == initialTarget.WirelessRadio.SoftwareOn;
             return restoredTarget.IsEnabled == initialTarget.IsEnabled && radioRestored
                 ? null
-                : "Windows вернула состояние, отличающееся от исходного.";
+                : "Windows returned a state that differs from the original state.";
         }
         catch (Exception exception)
         {
@@ -448,10 +448,10 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
         }
 
         var details = string.IsNullOrWhiteSpace(result.StandardError)
-            ? $"код выхода {result.ExitCode}"
+            ? $"exit code {result.ExitCode}"
             : result.StandardError.Trim();
         throw new NetworkSwitchException(
-            $"Windows PowerShell не смог {operation}: {details}");
+            $"Windows PowerShell could not {operation}: {details}");
     }
 
     private static bool IsSameDevice(

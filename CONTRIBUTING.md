@@ -1,12 +1,14 @@
-# Участие в разработке
+# Contributing to WinNetSwitch
 
-Спасибо за интерес к WinNetSwitch.
+**English** | [Русский](CONTRIBUTING.ru.md)
 
-Перед изменением кода ознакомьтесь с [правилами сообщества](CODE_OF_CONDUCT.md) и проверьте [существующие Issues](https://github.com/witqq/win-net-switch/issues). Для ошибки используйте [bug report](https://github.com/witqq/win-net-switch/issues/new?template=bug_report.yml), для новой возможности — [feature request](https://github.com/witqq/win-net-switch/issues/new?template=feature_request.yml). Уязвимости не публикуйте в Issues: следуйте [политике безопасности](SECURITY.md).
+Thank you for your interest in WinNetSwitch.
 
-## Подготовка окружения
+Before changing code, read the [Code of Conduct](CODE_OF_CONDUCT.md) and search the [existing issues](https://github.com/witqq/win-net-switch/issues). Use the [bug report](https://github.com/witqq/win-net-switch/issues/new?template=bug_report.yml) for defects and the [feature request](https://github.com/witqq/win-net-switch/issues/new?template=feature_request.yml) for new behavior. Do not disclose vulnerabilities in issues; follow the [Security Policy](SECURITY.md).
 
-Для сборки нужны Windows 10/11 и .NET SDK версии из `global.json`. В проекте нет сторонних NuGet-зависимостей.
+## Development environment
+
+Building requires Windows 10/11 and the .NET SDK specified by `global.json`. The project has no third-party NuGet dependencies.
 
 ```powershell
 dotnet restore .\WinNetSwitch.slnx
@@ -14,27 +16,27 @@ dotnet build .\WinNetSwitch.slnx --configuration Release --no-restore
 dotnet run --project .\tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj --configuration Release --no-restore
 ```
 
-Полная проверка, включая self-contained публикацию, нативный tray smoke-test и проверку payload установщика, запускается в PowerShell с правами администратора:
+The complete verification includes self-contained publication, the native tray smoke test, and installer payload validation. Run it from an elevated PowerShell session:
 
 ```powershell
 .\scripts\verify.ps1
 ```
 
-## Изменения
+## Changes
 
-- Не добавляйте секреты, реальные сетевые идентификаторы, пользовательские пути и диагностические логи.
-- Для изменения сетевой логики добавляйте тест, который отличает требуемое поведение от внешне похожего ошибочного состояния.
-- Не отключайте проверки итогового состояния и транзакционный откат ради ускорения операции.
-- Перед pull request выполните Release-сборку и тесты.
+- Do not add secrets, real network identifiers, user-specific paths, or diagnostic logs.
+- Add a test for network logic changes that distinguishes the required behavior from a superficially similar incorrect state.
+- Do not remove final-state verification or transactional rollback to make an operation appear faster.
+- Run the Release build and tests before opening a pull request.
 
-Сообщения коммитов оформляйте в повелительном стиле с префиксом `feat:`, `fix:`, `docs:`, `test:`, `build:` или `chore:`.
+Use imperative commit messages with a `feat:`, `fix:`, `docs:`, `test:`, `build:`, or `chore:` prefix.
 
-## Pull request
+## Pull requests
 
-1. Создайте отдельную ветку от актуальной `main`.
-2. Сделайте одно логически завершённое изменение вместе с тестами и документацией.
-3. Выполните команды проверки выше.
-4. Откройте pull request и заполните checklist шаблона.
-5. Дождитесь зелёного GitHub Actions workflow `CI`.
+1. Create a dedicated branch from the current `main`.
+2. Implement one logically complete change together with its tests and documentation.
+3. Run the verification commands above.
+4. Open a pull request and complete its checklist.
+5. Wait for the GitHub Actions `CI` workflow to pass.
 
-В pull request не включайте сгенерированные `artifacts`, локальные логи и файлы окружения. Инструкция для сопровождающего по выпуску версии находится в [docs/RELEASING.md](docs/RELEASING.md).
+Do not include generated `artifacts`, local logs, or environment files in a pull request. Maintainers should follow the [release guide](docs/RELEASING.md) when publishing a version.

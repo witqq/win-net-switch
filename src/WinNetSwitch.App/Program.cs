@@ -32,7 +32,7 @@ internal static class Program
             if (args.Length == 0)
             {
                 MessageBox.Show(
-                    $"Критическая ошибка: {exception.Message}\n\nПодробности: {AppLogger.LogPath}",
+                    $"Critical error: {exception.Message}\n\nDetails: {AppLogger.LogPath}",
                     "WinNetSwitch",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
@@ -57,8 +57,8 @@ internal static class Program
                 "--uninstall-silent",
                 StringComparison.OrdinalIgnoreCase);
             if (!silent && MessageBox.Show(
-                    "Удалить WinNetSwitch, автозапуск и диагностические логи?",
-                    "Удаление WinNetSwitch",
+                    "Remove WinNetSwitch, automatic startup, and diagnostic logs?",
+                    "Uninstall WinNetSwitch",
                     MessageBoxButtons.YesNo,
                     MessageBoxIcon.Question) != DialogResult.Yes)
             {
@@ -96,7 +96,7 @@ internal static class Program
         if (!isFirstInstance)
         {
             MessageBox.Show(
-                "WinNetSwitch уже запущен. Найдите его значок в системном трее.",
+                "WinNetSwitch is already running. Find its icon in the system tray.",
                 "WinNetSwitch",
                 MessageBoxButtons.OK,
                 MessageBoxIcon.Information);
@@ -140,8 +140,8 @@ internal static class Program
             if (!args.Contains("--silent", StringComparer.OrdinalIgnoreCase))
             {
                 MessageBox.Show(
-                    "WinNetSwitch полностью удалён.",
-                    "Удаление завершено",
+                    "WinNetSwitch has been completely removed.",
+                    "Uninstallation complete",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Information);
             }
@@ -153,8 +153,8 @@ internal static class Program
             if (!args.Contains("--silent", StringComparer.OrdinalIgnoreCase))
             {
                 MessageBox.Show(
-                    $"Удаление не завершено: {exception.Message}",
-                    "Ошибка удаления",
+                    $"Uninstallation failed: {exception.Message}",
+                    "Uninstallation error",
                     MessageBoxButtons.OK,
                     MessageBoxIcon.Error);
             }

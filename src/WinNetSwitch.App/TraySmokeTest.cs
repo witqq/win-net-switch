@@ -34,8 +34,8 @@ internal static class TraySmokeTest
                 item => item.Text.StartsWith("Wi-Fi —", StringComparison.Ordinal) && item.Checked);
             var ethernet = menu.SingleOrDefault(
                 item => item.Text.StartsWith("Ethernet —", StringComparison.Ordinal) && !item.Checked);
-            var hasRefresh = menu.Any(item => item.Text == "Обновить" && item.Enabled);
-            var hasExit = menu.Any(item => item.Text == "Выход" && item.Enabled);
+            var hasRefresh = menu.Any(item => item.Text == "Refresh" && item.Enabled);
+            var hasExit = menu.Any(item => item.Text == "Exit" && item.Enabled);
 
             if (phase == 0)
             {
@@ -48,13 +48,13 @@ internal static class TraySmokeTest
             }
 
             var refreshIsPending = !service.PendingRefreshCompleted;
-            var hasRefreshStatus = menu.Any(item => item.Text == "Обновление списка…");
+            var hasRefreshStatus = menu.Any(item => item.Text == "Refreshing adapter list…");
             var wifiActionsAvailable = wifi is not null &&
-                wifi.Children.Any(item => item.Text == "Выключить" && item.Enabled) &&
-                wifi.Children.Any(item => item.Text == "Включить только этот адаптер" && item.Enabled);
+                wifi.Children.Any(item => item.Text == "Disable" && item.Enabled) &&
+                wifi.Children.Any(item => item.Text == "Enable only this adapter" && item.Enabled);
             var ethernetActionsAvailable = ethernet is not null &&
-                ethernet.Children.Any(item => item.Text == "Включить" && item.Enabled) &&
-                ethernet.Children.Any(item => item.Text == "Включить только этот адаптер" && item.Enabled);
+                ethernet.Children.Any(item => item.Text == "Enable" && item.Enabled) &&
+                ethernet.Children.Any(item => item.Text == "Enable only this adapter" && item.Enabled);
 
             if (phase == 1 &&
                 context.IsTrayIconVisible &&

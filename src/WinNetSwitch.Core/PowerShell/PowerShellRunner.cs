@@ -54,7 +54,7 @@ public sealed class PowerShellRunner : IPowerShellRunner
         catch (Exception exception) when (exception is not OperationCanceledException)
         {
             throw new NetworkSwitchException(
-                "Не удалось запустить Windows PowerShell для управления сетевыми адаптерами.",
+                "Could not start Windows PowerShell for network adapter management.",
                 exception);
         }
 
@@ -74,7 +74,7 @@ public sealed class PowerShellRunner : IPowerShellRunner
             KillProcess(process);
             await Task.WhenAll(outputTask, errorTask).ConfigureAwait(false);
             throw new NetworkSwitchException(
-                $"Windows PowerShell не завершил операцию за {_timeout.TotalSeconds:0} секунд.");
+                $"Windows PowerShell did not complete the operation within {_timeout.TotalSeconds:0} seconds.");
         }
         catch (OperationCanceledException)
         {

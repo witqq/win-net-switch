@@ -16,20 +16,20 @@ internal static class NetAdapterJsonParser
         if (string.IsNullOrWhiteSpace(json))
         {
             throw new NetworkSwitchException(
-                "Windows PowerShell вернул пустой список сетевых адаптеров вместо JSON.");
+                "Windows PowerShell returned an empty adapter list instead of JSON.");
         }
 
         try
         {
             var items = JsonSerializer.Deserialize<List<AdapterDto>>(json, SerializerOptions)
-                ?? throw new NetworkSwitchException("Windows PowerShell вернул null вместо списка адаптеров.");
+                ?? throw new NetworkSwitchException("Windows PowerShell returned null instead of an adapter list.");
 
             return items.Select(ToAdapter).ToArray();
         }
         catch (JsonException exception)
         {
             throw new NetworkSwitchException(
-                "Не удалось разобрать список сетевых адаптеров, возвращённый Windows PowerShell.",
+                "Could not parse the network adapter list returned by Windows PowerShell.",
                 exception);
         }
     }
@@ -47,12 +47,12 @@ internal static class NetAdapterJsonParser
         if (id == Guid.Empty)
         {
             throw new NetworkSwitchException(
-                "Windows PowerShell вернул адаптер без InterfaceGuid и PnP InstanceId.");
+                "Windows PowerShell returned an adapter without an InterfaceGuid or PnP InstanceId.");
         }
 
         if (string.IsNullOrWhiteSpace(item.Name))
         {
-            throw new NetworkSwitchException($"Адаптер {id:D} не имеет имени.");
+            throw new NetworkSwitchException($"Adapter {id:D} has no name.");
         }
 
         return new PhysicalNetworkAdapter(

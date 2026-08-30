@@ -1,34 +1,36 @@
-# Правила сообщества WinNetSwitch
+# WinNetSwitch Community Code of Conduct
 
-## Наши обязательства
+**English** | [Русский](CODE_OF_CONDUCT.ru.md)
 
-Участники и сопровождающие WinNetSwitch обязуются поддерживать профессиональную, безопасную и доброжелательную среду независимо от опыта, происхождения, возраста, состояния здоровья, внешности, национальности, языка, религии, пола, гендерной идентичности и сексуальной ориентации человека.
+## Our commitment
 
-## Ожидаемое поведение
+WinNetSwitch participants and maintainers are committed to a professional, safe, and welcoming environment regardless of a person's experience, background, age, health, appearance, nationality, language, religion, sex, gender identity, or sexual orientation.
 
-- относитесь к другим участникам уважительно;
-- обсуждайте идеи и технические решения, а не личные качества автора;
-- формулируйте обратную связь конкретно и конструктивно;
-- признавайте ошибки и помогайте исправлять их;
-- удаляйте персональные сведения и секреты из Issues, pull requests и логов;
-- учитывайте безопасность пользователей при изменении сетевого состояния.
+## Expected behavior
 
-## Недопустимое поведение
+- Treat other participants with respect.
+- Discuss ideas and technical decisions rather than personal qualities.
+- Make feedback specific and constructive.
+- Acknowledge mistakes and help correct them.
+- Remove personal information and secrets from issues, pull requests, and logs.
+- Consider user safety when changing network state.
 
-- оскорбления, угрозы, травля и нежелательное внимание;
-- дискриминационные или сексуализированные высказывания и изображения;
-- публикация чужих персональных данных без явного разрешения;
-- намеренное нарушение обсуждений, спам и выдача себя за другого человека;
-- давление с целью отключить проверки безопасности, итогового состояния или отката операций.
+## Unacceptable behavior
 
-## Область действия
+- Insults, threats, harassment, or unwelcome attention.
+- Discriminatory or sexualized language and imagery.
+- Publishing another person's private information without explicit permission.
+- Deliberately disrupting discussions, spamming, or impersonating another person.
+- Pressuring contributors to disable safety checks, final-state verification, or rollback behavior.
 
-Правила распространяются на Issues, pull requests, code review, Discussions и другие пространства проекта, а также на публичные ситуации, где человек официально представляет WinNetSwitch.
+## Scope
 
-## Применение правил
+This Code applies to issues, pull requests, code review, discussions, and other project spaces, as well as public situations in which someone officially represents WinNetSwitch.
 
-Сопровождающие могут редактировать или удалять нарушающие правила материалы, закрывать обсуждения, отклонять изменения и временно или постоянно ограничивать участие. Решение должно соответствовать серьёзности и повторяемости нарушения.
+## Enforcement
 
-О нарушении можно конфиденциально сообщить на `belyiwork@mail.ru`. Укажите ссылку на материал и необходимый контекст, но не пересылайте чужие секреты. Сообщение будет рассмотрено без публичного раскрытия личности отправителя, насколько это позволяет расследование.
+Maintainers may edit or remove content that violates this Code, close discussions, reject changes, and temporarily or permanently restrict participation. Enforcement should be proportional to the severity and recurrence of the violation.
 
-Об уязвимостях продукта сообщайте отдельно через [GitHub Security Advisory](https://github.com/witqq/win-net-switch/security/advisories/new).
+Report community conduct incidents confidentially to `belyiwork@mail.ru`. Include a link and the context needed to investigate, but do not forward other people's secrets. The reporter's identity will not be disclosed publicly to the extent permitted by the investigation.
+
+Report product vulnerabilities separately through a [GitHub Security Advisory](https://github.com/witqq/win-net-switch/security/advisories/new).

@@ -42,7 +42,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         {
             ContextMenuStrip = _menu,
             Icon = _trayIcon,
-            Text = "WinNetSwitch — переключение сети",
+            Text = "WinNetSwitch — network adapter control",
             Visible = true,
         };
 
@@ -50,7 +50,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _menu.Closed += MenuOnClosed;
         _deferredMenuRebuildTimer.Tick += DeferredMenuRebuildTimerOnTick;
         _notifyIcon.DoubleClick += NotifyIconOnDoubleClick;
-        RebuildMenu("Загрузка физических адаптеров…");
+        RebuildMenu("Loading physical adapters…");
 
         var startupTimer = new System.Windows.Forms.Timer { Interval = 100 };
         startupTimer.Tick += (_, _) =>
@@ -170,7 +170,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _refreshInProgress = true;
         var versionAtStart = _stateVersion;
         AppLogger.Info("Refreshing physical adapter list.");
-        RequestMenuRebuild("Обновление списка…");
+        RequestMenuRebuild("Refreshing adapter list…");
         string? statusAfterRefresh = null;
         try
         {
@@ -193,10 +193,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         catch (Exception exception)
         {
-            statusAfterRefresh = Shorten($"Ошибка: {exception.Message}", 100);
+            statusAfterRefresh = Shorten($"Error: {exception.Message}", 100);
             if (showErrors)
             {
-                ShowError("Не удалось обновить список адаптеров", exception);
+                ShowError("Could not refresh the adapter list", exception);
             }
         }
         finally
@@ -225,7 +225,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             $"Adapter toggle requested: {adapter.Name} ({adapter.Id:D}), " +
             $"requested enabled={requestedState}, adapter enabled={adapter.IsEnabled}, " +
             $"radio on={adapter.WirelessRadio?.IsOn}.");
-        RequestMenuRebuild($"{(requestedState ? "Включение" : "Отключение")} «{adapter.Name}»…");
+        RequestMenuRebuild($"{(requestedState ? "Enabling" : "Disabling")} “{adapter.Name}”…");
         string? statusAfterToggle = null;
         try
         {
@@ -239,15 +239,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 $"enabled={requestedState}.");
             ShowBalloon(
                 ToolTipIcon.Info,
-                "Состояние сети изменено",
-                $"Адаптер «{adapter.Name}» {StateWord(requestedState)}. Остальные адаптеры не изменялись.");
+                "Network state changed",
+                $"Adapter “{adapter.Name}” was {StateWord(requestedState)}. Other adapters were not changed.");
         }
         catch (OperationCanceledException) when (_exiting)
         {
         }
         catch (Exception exception)
         {
-            ShowError($"Не удалось изменить «{adapter.Name}»", exception);
+            ShowError($"Could not change “{adapter.Name}”", exception);
             statusAfterToggle = await RefreshAfterFailureAsync();
         }
         finally
@@ -271,7 +271,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _stateVersion++;
         AppLogger.Info(
             $"Exclusive adapter enable requested: {adapter.Name} ({adapter.Id:D}).");
-        RequestMenuRebuild($"Включение только «{adapter.Name}»…");
+        RequestMenuRebuild($"Enabling only “{adapter.Name}”…");
         string? statusAfterChange = null;
         try
         {
@@ -283,15 +283,15 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 $"Exclusive adapter enable completed: {adapter.Name} ({adapter.Id:D}).");
             ShowBalloon(
                 ToolTipIcon.Info,
-                "Состояние сети изменено",
-                $"Адаптер «{adapter.Name}» включён, остальные адаптеры отключены.");
+                "Network state changed",
+                $"Adapter “{adapter.Name}” was enabled and all other adapters were disabled.");
         }
         catch (OperationCanceledException) when (_exiting)
         {
         }
         catch (Exception exception)
         {
-            ShowError($"Не удалось включить только «{adapter.Name}»", exception);
+            ShowError($"Could not enable only “{adapter.Name}”", exception);
             statusAfterChange = await RefreshAfterFailureAsync();
         }
         finally
@@ -318,7 +318,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         catch (Exception exception)
         {
             AppLogger.Error("Failed to refresh adapter state after a switch error.", exception);
-            return Shorten($"Состояние неизвестно: {exception.Message}", 100);
+            return Shorten($"State unknown: {exception.Message}", 100);
         }
     }
 
@@ -332,7 +332,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             previousItem.Dispose();
         }
 
-        var heading = new ToolStripMenuItem("Сетевые адаптеры")
+        var heading = new ToolStripMenuItem("Network adapters")
         {
             Enabled = false,
             Font = new Font(_menu.Font, FontStyle.Bold),
@@ -341,7 +341,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         if (_adapters.Count == 0 && status is null)
         {
-            _menu.Items.Add(new ToolStripMenuItem("Физические адаптеры не найдены")
+            _menu.Items.Add(new ToolStripMenuItem("No physical adapters found")
             {
                 Enabled = false,
             });
@@ -360,14 +360,14 @@ internal sealed class TrayApplicationContext : ApplicationContext
                 };
 
                 var capturedAdapter = adapter;
-                var toggleItem = new ToolStripMenuItem(adapter.IsActive ? "Выключить" : "Включить")
+                var toggleItem = new ToolStripMenuItem(adapter.IsActive ? "Disable" : "Enable")
                 {
                     Enabled = !_mutationInProgress,
                 };
                 toggleItem.Click += async (_, _) => await ToggleAdapterAsync(capturedAdapter);
                 item.DropDownItems.Add(toggleItem);
 
-                var enableOnlyItem = new ToolStripMenuItem("Включить только этот адаптер")
+                var enableOnlyItem = new ToolStripMenuItem("Enable only this adapter")
                 {
                     Enabled = !_mutationInProgress,
                 };
@@ -387,22 +387,22 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
 
         _menu.Items.Add(new ToolStripSeparator());
-        var refreshItem = new ToolStripMenuItem("Обновить")
+        var refreshItem = new ToolStripMenuItem("Refresh")
         {
             Enabled = !_refreshInProgress && !_mutationInProgress,
-            ShortcutKeyDisplayString = "двойной щелчок по значку",
+            ShortcutKeyDisplayString = "double-click the tray icon",
         };
         refreshItem.Click += async (_, _) => await RefreshAdaptersAsync(showErrors: true);
         _menu.Items.Add(refreshItem);
 
-        var openLogItem = new ToolStripMenuItem("Открыть лог ошибок")
+        var openLogItem = new ToolStripMenuItem("Open error log")
         {
             Enabled = true,
         };
         openLogItem.Click += (_, _) => OpenLog();
         _menu.Items.Add(openLogItem);
 
-        var exitItem = new ToolStripMenuItem("Выход");
+        var exitItem = new ToolStripMenuItem("Exit");
         exitItem.Enabled = true;
         exitItem.Click += (_, _) => ExitThread();
         _menu.Items.Add(exitItem);
@@ -425,17 +425,17 @@ internal sealed class TrayApplicationContext : ApplicationContext
     {
         var state = adapter switch
         {
-            { IsEnabled: false } => "отключён",
-            { WirelessRadio.IsOn: false } => "адаптер включён, Wi-Fi выключен",
-            { Status: "Up" } => "включён, подключён",
-            { Status: "Disconnected" } => "включён, нет подключения",
-            _ => $"включён, {adapter.Status}",
+            { IsEnabled: false } => "disabled",
+            { WirelessRadio.IsOn: false } => "adapter enabled, Wi-Fi off",
+            { Status: "Up" } => "enabled, connected",
+            { Status: "Disconnected" } => "enabled, disconnected",
+            _ => $"enabled, {adapter.Status}",
         };
         var speed = string.IsNullOrWhiteSpace(adapter.LinkSpeed) ? string.Empty : $" · {adapter.LinkSpeed}";
         return Shorten($"{adapter.Name} — {state}{speed}", 100);
     }
 
-    private static string StateWord(bool enabled) => enabled ? "включён" : "отключён";
+    private static string StateWord(bool enabled) => enabled ? "enabled" : "disabled";
 
     private static TrayMenuItemSnapshot CreateSnapshot(ToolStripMenuItem item) =>
         new(
@@ -453,7 +453,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         ShowBalloon(
             ToolTipIcon.Error,
             title,
-            $"{exception.Message}\nПодробности: {AppLogger.LogPath}");
+            $"{exception.Message}\nDetails: {AppLogger.LogPath}");
     }
 
     private void OpenLog()
@@ -469,7 +469,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
         }
         catch (Exception exception)
         {
-            ShowError("Не удалось открыть лог", exception);
+            ShowError("Could not open the log", exception);
         }
     }
 

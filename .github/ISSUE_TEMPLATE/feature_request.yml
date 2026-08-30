@@ -1,5 +1,5 @@
-name: Предложить улучшение
-description: Новая возможность или изменение поведения WinNetSwitch
+name: Request a feature
+description: New functionality or a behavior change for WinNetSwitch
 title: "[Feature]: "
 labels:
   - enhancement
@@ -7,28 +7,28 @@ body:
   - type: textarea
     id: problem
     attributes:
-      label: Какую проблему нужно решить?
-      description: Опишите пользовательский сценарий, а не только желаемую кнопку или реализацию.
+      label: What problem should be solved?
+      description: Describe the user scenario, not only the desired button or implementation.
     validations:
       required: true
   - type: textarea
     id: proposal
     attributes:
-      label: Предлагаемое поведение
-      description: Что должен наблюдать пользователь и как проверить результат?
+      label: Proposed behavior
+      description: What should the user observe, and how can the result be verified?
     validations:
       required: true
   - type: textarea
     id: alternatives
     attributes:
-      label: Рассмотренные альтернативы
-      description: Необязательно. Укажите существующий способ решения и его ограничения.
+      label: Alternatives considered
+      description: Optional. Describe an existing solution and its limitations.
   - type: checkboxes
     id: scope
     attributes:
-      label: Проверки
+      label: Checklist
       options:
-        - label: Предложение относится к управлению физическими сетевыми адаптерами Windows.
+        - label: This request concerns physical Windows network adapter management.
           required: true
-        - label: Я проверил существующие Issues и не нашёл аналогичного предложения.
+        - label: I searched existing issues and found no equivalent request.
           required: true

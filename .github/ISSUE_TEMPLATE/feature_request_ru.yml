@@ -1,0 +1,34 @@
+name: Предложить улучшение (Русский)
+description: Новая возможность или изменение поведения WinNetSwitch
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: Какую проблему нужно решить?
+      description: Опишите пользовательский сценарий, а не только желаемую кнопку или реализацию.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Предлагаемое поведение
+      description: Что должен наблюдать пользователь и как проверить результат?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Рассмотренные альтернативы
+      description: Необязательно. Укажите существующий способ решения и его ограничения.
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Проверки
+      options:
+        - label: Предложение относится к управлению физическими сетевыми адаптерами Windows.
+          required: true
+        - label: Я проверил существующие Issues и не нашёл аналогичного предложения.
+          required: true

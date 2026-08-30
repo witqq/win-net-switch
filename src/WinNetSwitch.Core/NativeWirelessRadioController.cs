@@ -52,7 +52,7 @@ public sealed class NativeWirelessRadioController : IWirelessRadioController
         if (states.Count == 0)
         {
             throw new NetworkSwitchException(
-                $"Windows WLAN API не вернул ни одного PHY для интерфейса {interfaceId:D}.");
+                $"The Windows WLAN API returned no PHY entries for interface {interfaceId:D}.");
         }
 
         foreach (var currentState in states)
@@ -76,7 +76,7 @@ public sealed class NativeWirelessRadioController : IWirelessRadioController
                         (uint)Marshal.SizeOf<WlanPhyRadioState>(),
                         statePointer,
                         IntPtr.Zero),
-                    "изменить software radio state");
+                    "change the software radio state");
             }
             finally
             {
@@ -99,7 +99,7 @@ public sealed class NativeWirelessRadioController : IWirelessRadioController
             return new SafeWlanHandle();
         }
 
-        ThrowIfError(result, "открыть WLAN client handle");
+        ThrowIfError(result, "open a WLAN client handle");
         return new SafeWlanHandle(rawHandle);
     }
 
@@ -107,7 +107,7 @@ public sealed class NativeWirelessRadioController : IWirelessRadioController
     {
         ThrowIfError(
             WlanEnumInterfaces(client, IntPtr.Zero, out var listPointer),
-            "получить список WLAN-интерфейсов");
+            "enumerate WLAN interfaces");
         try
         {
             var count = Marshal.ReadInt32(listPointer);
@@ -145,7 +145,7 @@ public sealed class NativeWirelessRadioController : IWirelessRadioController
                 out var dataSize,
                 out var dataPointer,
                 IntPtr.Zero),
-            "прочитать WLAN radio state");
+            "read the WLAN radio state");
         try
         {
             var count = Marshal.ReadInt32(dataPointer);
@@ -153,7 +153,7 @@ public sealed class NativeWirelessRadioController : IWirelessRadioController
             var maximumCount = Math.Max(0, ((int)dataSize - RadioStateHeaderBytes) / itemSize);
             if (count < 0 || count > maximumCount)
             {
-                throw new NetworkSwitchException("Windows WLAN API вернул некорректный размер radio state.");
+                throw new NetworkSwitchException("The Windows WLAN API returned an invalid radio state size.");
             }
 
             var states = new WlanPhyRadioState[count];
@@ -181,8 +181,8 @@ public sealed class NativeWirelessRadioController : IWirelessRadioController
         }
 
         throw new NetworkSwitchException(
-            $"Windows WLAN API не смог {operation}: {new Win32Exception((int)errorCode).Message} " +
-            $"(код {errorCode}).");
+            $"The Windows WLAN API could not {operation}: {new Win32Exception((int)errorCode).Message} " +
+            $"(error code {errorCode}).");
     }
 
     private static void EnsureWindows()

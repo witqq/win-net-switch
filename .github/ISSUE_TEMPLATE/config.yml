@@ -1,5 +1,5 @@
 blank_issues_enabled: false
 contact_links:
-  - name: Сообщить об уязвимости
+  - name: Report a vulnerability
     url: https://github.com/witqq/win-net-switch/security/advisories/new
-    about: Используйте приватный Security Advisory вместо публичной Issue.
+    about: Use a private Security Advisory instead of a public issue.

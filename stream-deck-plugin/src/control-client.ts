@@ -4,6 +4,7 @@ const DEFAULT_PIPE_PATH = String.raw`\\.\pipe\WinNetSwitch.Control.v1`;
 const PROTOCOL_VERSION = 1;
 const MAXIMUM_RESPONSE_CHARACTERS = 65_536;
 const REQUEST_TIMEOUT_MILLISECONDS = 15_000;
+const LIST_CACHE_MILLISECONDS = 2_000;
 
 export type NetworkAdapter = {
   id: string;
@@ -26,13 +27,36 @@ type ControlResponse = {
 
 export class WinNetSwitchClient {
   readonly #pipePath: string;
+  #cachedAdapters?: { expiresAt: number; adapters: NetworkAdapter[] };
+  #listInFlight?: Promise<NetworkAdapter[]>;
 
   constructor(pipePath = DEFAULT_PIPE_PATH) {
     this.#pipePath = pipePath;
   }
 
   listAdapters(): Promise<NetworkAdapter[]> {
-    return this.#request("list");
+    const now = Date.now();
+    if (this.#cachedAdapters && this.#cachedAdapters.expiresAt > now) {
+      return Promise.resolve(this.#cachedAdapters.adapters);
+    }
+
+    if (this.#listInFlight) {
+      return this.#listInFlight;
+    }
+
+    const request = this.#request("list").then((adapters) => {
+      this.#cachedAdapters = {
+        expiresAt: Date.now() + LIST_CACHE_MILLISECONDS,
+        adapters,
+      };
+      return adapters;
+    }).finally(() => {
+      if (this.#listInFlight === request) {
+        this.#listInFlight = undefined;
+      }
+    });
+    this.#listInFlight = request;
+    return request;
   }
 
   toggleAdapter(adapterId: string): Promise<NetworkAdapter[]> {
@@ -40,11 +64,17 @@ export class WinNetSwitchClient {
       return Promise.reject(new Error("Select a network adapter first."));
     }
 
-    return this.#request("toggle", adapterId);
+    this.#invalidateListCache();
+    return this.#request("toggle", adapterId).finally(() => this.#invalidateListCache());
   }
 
   cycleAdapters(): Promise<NetworkAdapter[]> {
-    return this.#request("cycle");
+    this.#invalidateListCache();
+    return this.#request("cycle").finally(() => this.#invalidateListCache());
+  }
+
+  #invalidateListCache(): void {
+    this.#cachedAdapters = undefined;
   }
 
   #request(command: ControlCommand, adapterId?: string): Promise<NetworkAdapter[]> {

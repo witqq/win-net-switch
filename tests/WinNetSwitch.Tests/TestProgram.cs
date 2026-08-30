@@ -1,4 +1,6 @@
 using System.IO.Pipes;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 using System.Text.Json;
 using WinNetSwitch.Core;
@@ -32,6 +34,7 @@ internal static class TestProgram
             ("Enable-only disables every other adapter", EnableOnlyDisablesOtherAdaptersAsync),
             ("Enable-only failure restores the initial state", EnableOnlyFailureRollsBackAsync),
             ("Cycle switches exclusively with deterministic wraparound", CycleSwitchesWithWraparoundAsync),
+            ("Windows control pipe is limited to the interactive logon", WindowsControlPipeIsLogonScopedAsync),
             ("Local control pipe serves bounded list, toggle, and cycle requests", LocalControlPipeServesRequestsAsync),
         };
 
@@ -379,11 +382,55 @@ internal static class TestProgram
         }
     }
 
+    private static Task WindowsControlPipeIsLogonScopedAsync()
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return Task.CompletedTask;
+        }
+
+        var security = LocalControlPipeFactory.CreateWindowsSecurityForCurrentLogon();
+        var owner = security.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier
+            ?? throw new InvalidOperationException("The pipe owner SID was not returned.");
+        using var identity = WindowsIdentity.GetCurrent();
+        var userSid = identity.User
+            ?? throw new InvalidOperationException("The current user SID was not returned.");
+        TestAssert.Equal(userSid.Value, owner.Value, "pipe owner SID");
+
+        var rules = security.GetAccessRules(
+                includeExplicit: true,
+                includeInherited: false,
+                typeof(SecurityIdentifier))
+            .Cast<PipeAccessRule>()
+            .ToArray();
+        TestAssert.Equal(1, rules.Length, "explicit pipe access rule count");
+        var allowedSid = (SecurityIdentifier)rules[0].IdentityReference;
+        TestAssert.True(
+            allowedSid.IsWellKnown(WellKnownSidType.LogonIdsSid),
+            "the only pipe rule should target the current logon SID");
+        TestAssert.Equal(AccessControlType.Allow, rules[0].AccessControlType, "pipe rule type");
+        TestAssert.Equal(PipeAccessRights.FullControl, rules[0].PipeAccessRights, "pipe rights");
+
+        var mandatoryLabel = LocalControlPipeFactory.CreateMediumIntegrityLabelDescriptor()
+            .GetSddlForm(AccessControlSections.Audit);
+        TestAssert.Equal(
+            LocalControlPipeFactory.MediumIntegrityLabelSddl,
+            mandatoryLabel,
+            "pipe mandatory label");
+        return Task.CompletedTask;
+    }
+
     private static async Task LocalControlPipeServesRequestsAsync()
     {
         var (runner, _, service) = CreateService(true, true, false);
+        var notifications = new List<NetworkControlNotification>();
+        var serverErrors = new List<string>();
         using (service)
-        using (var server = new NamedPipeControlServer(service))
+        using (var server = new NamedPipeControlServer(
+                   service,
+                   logError: (message, exception) =>
+                       serverErrors.Add($"{message} {exception.Message}"),
+                   notify: notifications.Add))
         {
             server.Start();
 
@@ -406,6 +453,9 @@ internal static class TestProgram
                 TestAssert.False(
                     runner.Adapters[EthernetId].IsEnabled,
                     "pipe toggle must not enable Ethernet");
+                TestAssert.Equal(1, notifications.Count, "toggle notification count");
+                TestAssert.Contains("Wi-Fi", notifications[0].Message);
+                TestAssert.False(notifications[0].IsError, "toggle notification should be successful");
             }
 
             using (var cycle = JsonDocument.Parse(
@@ -416,6 +466,9 @@ internal static class TestProgram
                     runner.Adapters[EthernetId].IsEnabled,
                     "pipe cycle should select alphabetically first Ethernet when none is active");
                 TestAssert.False(runner.Adapters[WifiId].IsEnabled, "pipe cycle should leave Wi-Fi disabled");
+                TestAssert.Equal(2, notifications.Count, "cycle notification count");
+                TestAssert.Contains("Ethernet", notifications[1].Message);
+                TestAssert.False(notifications[1].IsError, "cycle notification should be successful");
             }
 
             using var oversized = JsonDocument.Parse(
@@ -423,6 +476,9 @@ internal static class TestProgram
             TestAssert.False(
                 oversized.RootElement.GetProperty("ok").GetBoolean(),
                 "oversized request should be rejected");
+            TestAssert.Equal(2, notifications.Count, "invalid request notification count");
+            TestAssert.Equal(1, serverErrors.Count, "invalid request log count");
+            TestAssert.Contains("exceeds 4096", serverErrors[0]);
         }
     }
 

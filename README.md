@@ -82,7 +82,7 @@ The optional plugin provides two Windows-only Stream Deck actions:
 
 The plugin is deliberately small and does **not** contain WinNetSwitch. Install and start the current [WinNetSwitch companion](https://github.com/witqq/win-net-switch/releases/latest/download/WinNetSwitch-Setup.exe) first. Then download and double-click `dev.witqq.win-net-switch.streamDeckPlugin`, approve installation in Stream Deck, and add either action to a key. `Adapter On/Off` exposes an adapter selector, a refresh control, and direct Download and Support buttons.
 
-The key title and image show the selected adapter state, the active adapter after cycling, progress, or an actionable missing-companion error. Stream Deck 7.1 or later is required. Until the Marketplace listing is approved, install the plugin directly from the GitHub Release.
+The key title and image show the selected adapter state, the active adapter after cycling, progress, or an actionable missing-companion error. Successful changes also show a green key confirmation and a Windows tray notification. Stream Deck runs with ordinary user rights; do not launch it as administrator. WinNetSwitch keeps the required elevation and exposes only the bounded local commands to the current interactive logon session. Stream Deck 7.1 or later is required. Until the Marketplace listing is approved, install the plugin directly from the GitHub Release.
 
 See the complete [Stream Deck plugin and Marketplace guide](docs/STREAM_DECK.md) and [privacy policy](PRIVACY.md).
 
@@ -171,7 +171,7 @@ npm run package
 
 The package is written to `artifacts\stream-deck\dev.witqq.win-net-switch.streamDeckPlugin`. The official Elgato CLI validates the manifest and file structure while packaging. `scripts\test-stream-deck-package.ps1` additionally rejects application executables or scripts inside the plugin archive.
 
-The complete local verification requires an elevated PowerShell session. It performs a Release build, 18 .NET tests, plugin dependency installation, typechecking and tests, Stream Deck validation and packaging, self-contained application publication, a read-only probe of real adapters, native tray and local-control-pipe smoke tests, and installer payload validation:
+The complete local verification requires an elevated PowerShell session. It performs a Release build, 19 .NET tests, plugin dependency installation, typechecking and tests, Stream Deck validation and packaging, self-contained application publication, a read-only probe of real adapters, native tray and local-control-pipe smoke tests, and installer payload validation:
 
 ```powershell
 .\scripts\verify.ps1

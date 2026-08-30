@@ -410,12 +410,17 @@ internal static class TestProgram
         TestAssert.Equal(AccessControlType.Allow, rules[0].AccessControlType, "pipe rule type");
         TestAssert.Equal(PipeAccessRights.FullControl, rules[0].PipeAccessRights, "pipe rights");
 
-        var mandatoryLabel = LocalControlPipeFactory.CreateMediumIntegrityLabelDescriptor()
-            .GetSddlForm(AccessControlSections.Audit);
-        TestAssert.Equal(
-            LocalControlPipeFactory.MediumIntegrityLabelSddl,
-            mandatoryLabel,
-            "pipe mandatory label");
+        var mandatoryDescriptor = LocalControlPipeFactory.CreateMediumIntegrityLabelDescriptor();
+        TestAssert.Equal(1, mandatoryDescriptor.SystemAcl?.Count ?? 0, "mandatory label ACE count");
+        var mandatoryAce = mandatoryDescriptor.SystemAcl![0];
+        var mandatoryAceBytes = new byte[mandatoryAce.BinaryLength];
+        mandatoryAce.GetBinaryForm(mandatoryAceBytes, 0);
+        TestAssert.Equal((byte)0x11, mandatoryAceBytes[0], "mandatory ACE type");
+        TestAssert.Equal(1, BitConverter.ToInt32(mandatoryAceBytes, 4), "NO_WRITE_UP mask");
+        var mandatorySid = new SecurityIdentifier(mandatoryAceBytes, 8);
+        TestAssert.True(
+            mandatorySid.IsWellKnown(WellKnownSidType.WinMediumLabelSid),
+            "mandatory label should use the medium-integrity SID");
         return Task.CompletedTask;
     }
 

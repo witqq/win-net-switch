@@ -19,6 +19,8 @@ public sealed class NamedPipeControlServer : IDisposable
     private readonly INetworkAdapterService _adapterService;
     private readonly Action<string> _logInfo;
     private readonly Action<string, Exception> _logError;
+    private readonly Action<NetworkControlNotification> _notify;
+    private readonly Func<string, NamedPipeServerStream> _pipeFactory;
     private readonly CancellationTokenSource _stopSource = new();
     private Task? _serverTask;
     private bool _disposed;
@@ -26,11 +28,29 @@ public sealed class NamedPipeControlServer : IDisposable
     public NamedPipeControlServer(
         INetworkAdapterService adapterService,
         Action<string>? logInfo = null,
-        Action<string, Exception>? logError = null)
+        Action<string, Exception>? logError = null,
+        Action<NetworkControlNotification>? notify = null)
+        : this(
+            adapterService,
+            LocalControlPipeFactory.Create,
+            logInfo,
+            logError,
+            notify)
+    {
+    }
+
+    internal NamedPipeControlServer(
+        INetworkAdapterService adapterService,
+        Func<string, NamedPipeServerStream> pipeFactory,
+        Action<string>? logInfo = null,
+        Action<string, Exception>? logError = null,
+        Action<NetworkControlNotification>? notify = null)
     {
         _adapterService = adapterService ?? throw new ArgumentNullException(nameof(adapterService));
+        _pipeFactory = pipeFactory ?? throw new ArgumentNullException(nameof(pipeFactory));
         _logInfo = logInfo ?? (_ => { });
         _logError = logError ?? ((_, _) => { });
+        _notify = notify ?? (_ => { });
     }
 
     public void Start()
@@ -41,7 +61,8 @@ public sealed class NamedPipeControlServer : IDisposable
             throw new InvalidOperationException("The local control server is already running.");
         }
 
-        _serverTask = Task.Run(() => RunAsync(_stopSource.Token));
+        var initialPipe = _pipeFactory(PipeName);
+        _serverTask = Task.Run(() => RunAsync(initialPipe, _stopSource.Token));
         _logInfo($"Local control server started. Pipe: {PipeName}.");
     }
 
@@ -68,18 +89,17 @@ public sealed class NamedPipeControlServer : IDisposable
         }
     }
 
-    private async Task RunAsync(CancellationToken cancellationToken)
+    private async Task RunAsync(
+        NamedPipeServerStream initialPipe,
+        CancellationToken cancellationToken)
     {
+        NamedPipeServerStream? initialPipeToUse = initialPipe;
         while (!cancellationToken.IsCancellationRequested)
         {
             try
             {
-                await using var pipe = new NamedPipeServerStream(
-                    PipeName,
-                    PipeDirection.InOut,
-                    maxNumberOfServerInstances: 1,
-                    PipeTransmissionMode.Byte,
-                    PipeOptions.Asynchronous | PipeOptions.CurrentUserOnly);
+                await using var pipe = initialPipeToUse ?? _pipeFactory(PipeName);
+                initialPipeToUse = null;
                 await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
                 await HandleConnectionAsync(pipe, cancellationToken).ConfigureAwait(false);
             }
@@ -100,6 +120,11 @@ public sealed class NamedPipeControlServer : IDisposable
                     break;
                 }
             }
+        }
+
+        if (initialPipeToUse is not null)
+        {
+            await initialPipeToUse.DisposeAsync().ConfigureAwait(false);
         }
     }
 
@@ -122,6 +147,7 @@ public sealed class NamedPipeControlServer : IDisposable
             AutoFlush = true,
         };
 
+        NetworkControlRequest? request = null;
         NetworkControlResponse response;
         try
         {
@@ -129,7 +155,7 @@ public sealed class NamedPipeControlServer : IDisposable
                     .ConfigureAwait(false)
                 ?? throw new InvalidDataException("The request was empty.");
 
-            var request = JsonSerializer.Deserialize<NetworkControlRequest>(
+            request = JsonSerializer.Deserialize<NetworkControlRequest>(
                     requestJson,
                     SerializerOptions)
                 ?? throw new InvalidDataException("The request JSON was empty.");
@@ -142,6 +168,13 @@ public sealed class NamedPipeControlServer : IDisposable
         catch (Exception exception)
         {
             _logError("Local control request failed.", exception);
+            if (request?.Command is NetworkControlCommand.Toggle or NetworkControlCommand.Cycle)
+            {
+                Notify(new NetworkControlNotification(
+                    "Network switch failed",
+                    exception.Message,
+                    IsError: true));
+            }
             response = NetworkControlResponse.Failure(exception.Message);
         }
 
@@ -212,7 +245,60 @@ public sealed class NamedPipeControlServer : IDisposable
         };
 
         _logInfo($"Local control request completed: {request.Command}.");
+        NotifySuccessfulMutation(request, adapters);
         return NetworkControlResponse.Success(adapters);
+    }
+
+    private void NotifySuccessfulMutation(
+        NetworkControlRequest request,
+        IReadOnlyList<PhysicalNetworkAdapter> adapters)
+    {
+        NetworkControlNotification? notification = request.Command switch
+        {
+            NetworkControlCommand.Toggle => CreateToggleNotification(request, adapters),
+            NetworkControlCommand.Cycle => CreateCycleNotification(adapters),
+            _ => null,
+        };
+        if (notification is not null)
+        {
+            Notify(notification);
+        }
+    }
+
+    private static NetworkControlNotification CreateToggleNotification(
+        NetworkControlRequest request,
+        IReadOnlyList<PhysicalNetworkAdapter> adapters)
+    {
+        var adapterId = RequireAdapterId(request);
+        var adapter = adapters.FirstOrDefault(item => item.Id == adapterId)
+            ?? throw new InvalidDataException("The toggled adapter disappeared from the result.");
+        return new NetworkControlNotification(
+            "Network adapter changed",
+            $"“{adapter.Name}” is now {(adapter.IsActive ? "on" : "off")}. Other adapters were not changed.",
+            IsError: false);
+    }
+
+    private static NetworkControlNotification CreateCycleNotification(
+        IReadOnlyList<PhysicalNetworkAdapter> adapters)
+    {
+        var activeAdapter = adapters.FirstOrDefault(adapter => adapter.IsActive)
+            ?? throw new InvalidDataException("No adapter is active after cycling.");
+        return new NetworkControlNotification(
+            "Active network changed",
+            $"“{activeAdapter.Name}” is now the only active adapter.",
+            IsError: false);
+    }
+
+    private void Notify(NetworkControlNotification notification)
+    {
+        try
+        {
+            _notify(notification);
+        }
+        catch (Exception exception)
+        {
+            _logError("Local control notification failed.", exception);
+        }
     }
 
     private static Guid RequireAdapterId(NetworkControlRequest request) =>
@@ -267,3 +353,8 @@ public sealed class NamedPipeControlServer : IDisposable
             new(ProtocolVersion, Ok: false, Adapters: [], Error: error);
     }
 }
+
+public sealed record NetworkControlNotification(
+    string Title,
+    string Message,
+    bool IsError);

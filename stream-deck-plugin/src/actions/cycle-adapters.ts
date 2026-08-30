@@ -26,6 +26,7 @@ export class CycleAdaptersAction extends SingletonAction<CycleAdapterSettings> {
       await ev.action.setTitle("Switching…");
       const adapters = await this.#client.cycleAdapters();
       await ev.action.setTitle(formatCycleTitle(adapters));
+      await ev.action.showOk();
     } catch (error) {
       await this.#renderError(ev.action, error);
     }

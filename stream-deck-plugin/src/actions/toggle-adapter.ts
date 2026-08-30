@@ -52,6 +52,7 @@ export class ToggleAdapterAction extends SingletonAction<ToggleAdapterSettings> 
       }
 
       await this.#renderAdapter(ev.action, adapter);
+      await ev.action.showOk();
     } catch (error) {
       await this.#renderError(ev.action, error);
     }

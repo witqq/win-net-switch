@@ -19,10 +19,10 @@ WinNetSwitch releases are created by GitHub Actions from an existing annotated `
 A positive search must find the new version in every expected file:
 
 ```powershell
-rg -n "1\.4\.1" Directory.Build.props src\WinNetSwitch.Windows src\WinNetSwitch.App\app.manifest src\WinNetSwitch.Setup\app.manifest
+rg -n "1\.4\.2" Directory.Build.props src\WinNetSwitch.Windows src\WinNetSwitch.App\app.manifest src\WinNetSwitch.Setup\app.manifest
 ```
 
-Replace `1.4.1` with the actual release version.
+Replace `1.4.2` with the actual release version.
 
 ## Verification and publication
 
@@ -35,8 +35,8 @@ Run the complete local verification from an elevated PowerShell session:
 Commit the version change, push `main`, and wait for the `CI` workflow to pass. Only then create the tag:
 
 ```powershell
-git tag -a v1.4.1 -m "WinNetSwitch 1.4.1"
-git push origin v1.4.1
+git tag -a v1.4.2 -m "WinNetSwitch 1.4.2"
+git push origin v1.4.2
 ```
 
 The Release workflow:

@@ -82,7 +82,7 @@ $actual -eq $expected
 
 Плагин намеренно маленький и **не содержит** WinNetSwitch. Сначала установите и запустите актуальное [companion-приложение WinNetSwitch](https://github.com/witqq/win-net-switch/releases/latest/download/WinNetSwitch-Setup.exe). Затем скачайте и откройте двойным щелчком `dev.witqq.win-net-switch.streamDeckPlugin`, подтвердите установку в Stream Deck и добавьте нужную команду на кнопку. В настройках `Adapter On/Off` есть выбор адаптера, обновление списка и прямые кнопки Download и Support.
 
-Изображение и текст кнопки показывают состояние выбранного адаптера, активный адаптер после циклического переключения, процесс операции или понятную ошибку отсутствующего companion. Требуется Stream Deck 7.1 или новее. До одобрения карточки Marketplace устанавливайте плагин непосредственно из GitHub Release.
+Изображение и текст кнопки показывают состояние выбранного адаптера, активный адаптер после циклического переключения, процесс операции или понятную ошибку отсутствующего companion. Успешное изменение также показывает зелёное подтверждение на кнопке и Windows-уведомление из трея. Stream Deck работает с обычными пользовательскими правами — не запускайте его от имени администратора. Необходимое повышение остаётся у WinNetSwitch, который принимает только ограниченные локальные команды текущего интерактивного сеанса. Требуется Stream Deck 7.1 или новее. До одобрения карточки Marketplace устанавливайте плагин непосредственно из GitHub Release.
 
 Подробности находятся в [руководстве по Stream Deck и Marketplace](docs/STREAM_DECK.ru.md) и [политике конфиденциальности](PRIVACY.ru.md).
 
@@ -171,7 +171,7 @@ npm run package
 
 Пакет создаётся в `artifacts\stream-deck\dev.witqq.win-net-switch.streamDeckPlugin`. Официальная Elgato CLI проверяет manifest и структуру во время упаковки. Скрипт `scripts\test-stream-deck-package.ps1` дополнительно отклоняет архив, если внутрь попали EXE, DLL, MSI или системные скрипты companion-приложения.
 
-Полная локальная проверка требует elevated PowerShell и выполняет Release-сборку, 18 .NET-тестов, установку зависимостей плагина, typecheck и plugin-тесты, валидацию и упаковку Stream Deck, self-contained публикацию приложения, read-only probe реальных адаптеров, нативные tray и local-control-pipe smoke-тесты и проверку payload установщика:
+Полная локальная проверка требует elevated PowerShell и выполняет Release-сборку, 19 .NET-тестов, установку зависимостей плагина, typecheck и plugin-тесты, валидацию и упаковку Stream Deck, self-contained публикацию приложения, read-only probe реальных адаптеров, нативные tray и local-control-pipe smoke-тесты и проверку payload установщика:
 
 ```powershell
 .\scripts\verify.ps1

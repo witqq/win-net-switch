@@ -75,6 +75,26 @@ test("client sends typed list, toggle, and cycle requests", async () => {
   ]);
 });
 
+test("adapter lists are coalesced briefly and invalidated by mutations", async () => {
+  const requestOffset = requests.length;
+  const client = new WinNetSwitchClient(pipePath);
+
+  await Promise.all([
+    client.listAdapters(),
+    client.listAdapters(),
+    client.listAdapters(),
+  ]);
+  await client.listAdapters();
+  await client.toggleAdapter(adapters[0]!.id);
+  await client.listAdapters();
+
+  assert.deepEqual(requests.slice(requestOffset), [
+    { version: 1, command: "list" },
+    { version: 1, command: "toggle", adapterId: adapters[0]!.id },
+    { version: 1, command: "list" },
+  ]);
+});
+
 test("titles expose adapter and active cycle state", () => {
   assert.equal(formatAdapterTitle(adapters[0]!), "Wi-Fi\nON");
   assert.equal(formatCycleTitle(adapters), "Active\nWi-Fi");

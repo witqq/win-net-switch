@@ -4,7 +4,7 @@
 
 ## Architecture and dependency
 
-The Stream Deck plugin is a non-elevated Node.js client. It sends bounded JSON requests to the elevated WinNetSwitch tray application through the current-user-only `WinNetSwitch.Control.v1` named pipe. Adapter discovery and mutations remain in `PhysicalNetworkAdapterService`; the plugin does not invoke PowerShell or Windows network APIs directly.
+The Stream Deck plugin is a non-elevated Node.js client. It sends bounded JSON requests to the elevated WinNetSwitch tray application through the local `WinNetSwitch.Control.v1` named pipe. The pipe grants access only to the current interactive Windows logon SID, uses a medium mandatory-integrity label so the ordinary Stream Deck process can connect, and does not grant access to `Everyone`, another sign-in session, or a remote logon. Adapter discovery and mutations remain in `PhysicalNetworkAdapterService`; the plugin does not invoke PowerShell or Windows network APIs directly.
 
 WinNetSwitch is a mandatory, separately installed companion. The `.streamDeckPlugin` package must not contain `WinNetSwitch.exe`, the installer, a DLL, MSI, PowerShell script, batch file, or command script. The plugin's Property Inspector and manifest provide these links:
 
@@ -21,9 +21,13 @@ WinNetSwitch is a mandatory, separately installed companion. The `.streamDeckPlu
 5. Drag `Adapter On/Off` or `Cycle Adapters` from the WinNetSwitch category to a key.
 6. For `Adapter On/Off`, select a physical adapter in the Property Inspector. Use its refresh control after hardware changes.
 
+Run Stream Deck normally, not as administrator. WinNetSwitch alone remains elevated because adapter mutations require administrator rights. Successful mutations display a green Stream Deck confirmation and a Windows tray notification; failures display an alert and a Windows error notification. Repeated Property Inspector requests within two seconds share one adapter query, and the cache is invalidated after every mutation.
+
 `Adapter On/Off` changes only the selected adapter. `Cycle Adapters` sorts physical adapters by display name without case sensitivity, selects the item after the first active adapter, wraps after the last item, and calls the transactional enable-only operation. If none is active, it selects the first item.
 
 Disabling an adapter can interrupt downloads and remote sessions. Do not test a mutation on the adapter that carries the current remote connection.
+
+If a key says `Start WinNetSwitch`, confirm that the current companion is running and inspect `%APPDATA%\Elgato\StreamDeck\Plugins\dev.witqq.win-net-switch.sdPlugin\logs`. Do not work around a connection failure by permanently elevating Stream Deck; report the companion and plugin versions with sanitized log excerpts.
 
 ## Local development
 

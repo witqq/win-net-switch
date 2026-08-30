@@ -17,6 +17,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     };
     private readonly Icon _trayIcon;
     private readonly NotifyIcon _notifyIcon;
+    private readonly SynchronizationContext _uiContext;
     private readonly NamedPipeControlServer? _controlServer;
     private IReadOnlyList<PhysicalNetworkAdapter> _adapters = [];
     private bool _mutationInProgress;
@@ -40,14 +41,6 @@ internal sealed class TrayApplicationContext : ApplicationContext
         bool startControlServer = false)
     {
         _adapterService = adapterService ?? throw new ArgumentNullException(nameof(adapterService));
-        if (startControlServer)
-        {
-            _controlServer = new NamedPipeControlServer(
-                _adapterService,
-                AppLogger.Info,
-                AppLogger.Error);
-            _controlServer.Start();
-        }
 
         _trayIcon = TrayIconFactory.Create();
         _notifyIcon = new NotifyIcon
@@ -57,6 +50,17 @@ internal sealed class TrayApplicationContext : ApplicationContext
             Text = "WinNetSwitch — network adapter control",
             Visible = true,
         };
+        _uiContext = SynchronizationContext.Current ?? new WindowsFormsSynchronizationContext();
+
+        if (startControlServer)
+        {
+            _controlServer = new NamedPipeControlServer(
+                _adapterService,
+                AppLogger.Info,
+                AppLogger.Error,
+                QueueControlNotification);
+            _controlServer.Start();
+        }
 
         _menu.Opening += MenuOnOpening;
         _menu.Closed += MenuOnClosed;
@@ -497,6 +501,20 @@ internal sealed class TrayApplicationContext : ApplicationContext
         _notifyIcon.BalloonTipText = Shorten(message, 255);
         _notifyIcon.ShowBalloonTip(5000);
     }
+
+    private void QueueControlNotification(NetworkControlNotification notification) =>
+        _uiContext.Post(
+            _ =>
+            {
+                if (!_disposed && !_exiting)
+                {
+                    ShowBalloon(
+                        notification.IsError ? ToolTipIcon.Error : ToolTipIcon.Info,
+                        notification.Title,
+                        notification.Message);
+                }
+            },
+            state: null);
 
     private static string Shorten(string value, int maximumLength) =>
         value.Length <= maximumLength

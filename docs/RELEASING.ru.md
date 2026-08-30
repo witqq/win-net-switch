@@ -19,10 +19,10 @@
 Положительный поиск должен вернуть новую версию во всех ожидаемых файлах:
 
 ```powershell
-rg -n "1\.4\.1" Directory.Build.props src\WinNetSwitch.Windows src\WinNetSwitch.App\app.manifest src\WinNetSwitch.Setup\app.manifest
+rg -n "1\.4\.2" Directory.Build.props src\WinNetSwitch.Windows src\WinNetSwitch.App\app.manifest src\WinNetSwitch.Setup\app.manifest
 ```
 
-Замените `1.4.1` на фактическую версию релиза.
+Замените `1.4.2` на фактическую версию релиза.
 
 ## Проверка и публикация
 
@@ -35,8 +35,8 @@ rg -n "1\.4\.1" Directory.Build.props src\WinNetSwitch.Windows src\WinNetSwitch.
 Затем закоммитьте изменение версии, отправьте `main` и дождитесь зелёного workflow `CI`. Только после этого создавайте тег:
 
 ```powershell
-git tag -a v1.4.1 -m "WinNetSwitch 1.4.1"
-git push origin v1.4.1
+git tag -a v1.4.2 -m "WinNetSwitch 1.4.2"
+git push origin v1.4.2
 ```
 
 Release workflow:

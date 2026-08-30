@@ -7,3 +7,4 @@ artifacts/
 *.suo
 TestResults/
 node_modules/
+.DS_Store

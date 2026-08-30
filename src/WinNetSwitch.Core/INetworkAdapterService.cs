@@ -10,7 +10,14 @@ public interface INetworkAdapterService
         bool enabled,
         CancellationToken cancellationToken = default);
 
+    Task<IReadOnlyList<PhysicalNetworkAdapter>> ToggleAdapterAsync(
+        Guid targetAdapterId,
+        CancellationToken cancellationToken = default);
+
     Task<IReadOnlyList<PhysicalNetworkAdapter>> EnableOnlyAsync(
         Guid targetAdapterId,
+        CancellationToken cancellationToken = default);
+
+    Task<IReadOnlyList<PhysicalNetworkAdapter>> CycleToNextAsync(
         CancellationToken cancellationToken = default);
 }

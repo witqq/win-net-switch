@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: Existing version tag to release, for example v1.3.0
+        description: Existing version tag to release, for example v1.4.0
         required: true
         type: string
 
@@ -38,6 +38,13 @@ jobs:
         with:
           global-json-file: global.json
 
+      - name: Install Node.js
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: stream-deck-plugin/package-lock.json
+
       - name: Verify tag and project version
         shell: powershell
         run: |
@@ -59,19 +66,57 @@ jobs:
       - name: Test
         run: dotnet run --project .\tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj --configuration Release --no-build
 
+      - name: Install Stream Deck plugin dependencies
+        working-directory: .\stream-deck-plugin
+        run: npm ci
+
+      - name: Typecheck and test Stream Deck plugin
+        working-directory: .\stream-deck-plugin
+        run: |
+          npm run typecheck
+          npm test
+
+      - name: Package Stream Deck plugin
+        working-directory: .\stream-deck-plugin
+        run: npm run package
+
+      - name: Verify Stream Deck plugin package
+        shell: powershell
+        run: .\scripts\test-stream-deck-package.ps1
+
       - name: Native tray smoke test
         run: dotnet run --project .\src\WinNetSwitch.App\WinNetSwitch.App.csproj --configuration Release --no-build -- --smoke-test
+
+      - name: Native local control pipe smoke test
+        run: dotnet run --project .\src\WinNetSwitch.App\WinNetSwitch.App.csproj --configuration Release --no-build -- --ipc-smoke-test
 
       - name: Publish application and installer
         shell: powershell
         run: .\scripts\publish.ps1
+
+      - name: Published artifact self-tests
+        shell: powershell
+        run: |
+          $checks = @(
+            @{ File = 'artifacts\publish\win-x64\WinNetSwitch.exe'; Argument = '--logging-self-test' },
+            @{ File = 'artifacts\publish\win-x64\WinNetSwitch.exe'; Argument = '--smoke-test' },
+            @{ File = 'artifacts\publish\win-x64\WinNetSwitch.exe'; Argument = '--ipc-smoke-test' },
+            @{ File = 'artifacts\setup\win-x64\WinNetSwitch-Setup.exe'; Argument = '--self-test' }
+          )
+          foreach ($check in $checks) {
+            $process = Start-Process -FilePath $check.File -ArgumentList $check.Argument -Wait -PassThru
+            if ($process.ExitCode -ne 0) {
+              throw "$($check.File) $($check.Argument) failed with exit code $($process.ExitCode)."
+            }
+          }
 
       - name: Create checksums
         shell: powershell
         run: |
           $files = @(
             'artifacts\publish\win-x64\WinNetSwitch.exe',
-            'artifacts\setup\win-x64\WinNetSwitch-Setup.exe'
+            'artifacts\setup\win-x64\WinNetSwitch-Setup.exe',
+            'artifacts\stream-deck\dev.witqq.win-net-switch.streamDeckPlugin'
           )
           $lines = foreach ($file in $files) {
             $hash = (Get-FileHash -Algorithm SHA256 -LiteralPath $file).Hash.ToLowerInvariant()
@@ -85,6 +130,7 @@ jobs:
           gh release create $env:RELEASE_TAG `
             'artifacts\setup\win-x64\WinNetSwitch-Setup.exe#Windows installer' `
             'artifacts\publish\win-x64\WinNetSwitch.exe#Portable self-contained application' `
+            'artifacts\stream-deck\dev.witqq.win-net-switch.streamDeckPlugin#Stream Deck plugin' `
             'artifacts\SHA256SUMS.txt#SHA-256 checksums' `
             --verify-tag `
             --generate-notes `

@@ -1,3 +1,6 @@
+using System.IO.Pipes;
+using System.Text;
+using System.Text.Json;
 using WinNetSwitch.Core;
 using WinNetSwitch.Core.PowerShell;
 
@@ -25,8 +28,11 @@ internal static class TestProgram
             ("Missing target is rejected before mutations", MissingTargetIsRejectedAsync),
             ("Concurrent toggles are serialized", ConcurrentTogglesAreSerializedAsync),
             ("Recent adapter snapshot avoids a redundant pre-switch query", RecentSnapshotSpeedsUpSwitchAsync),
+            ("Toggle changes only the selected adapter", ToggleChangesOnlySelectedAdapterAsync),
             ("Enable-only disables every other adapter", EnableOnlyDisablesOtherAdaptersAsync),
             ("Enable-only failure restores the initial state", EnableOnlyFailureRollsBackAsync),
+            ("Cycle switches exclusively with deterministic wraparound", CycleSwitchesWithWraparoundAsync),
+            ("Local control pipe serves bounded list, toggle, and cycle requests", LocalControlPipeServesRequestsAsync),
         };
 
         var failures = new List<string>();
@@ -306,6 +312,29 @@ internal static class TestProgram
         }
     }
 
+    private static async Task ToggleChangesOnlySelectedAdapterAsync()
+    {
+        var (runner, radio, service) = CreateService(true, true, true);
+        using (service)
+        {
+            var disabled = await service.ToggleAdapterAsync(WifiId);
+
+            TestAssert.False(disabled.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should be off");
+            TestAssert.True(
+                disabled.Single(adapter => adapter.Id == EthernetId).IsActive,
+                "Ethernet should remain on");
+
+            var enabled = await service.ToggleAdapterAsync(WifiId);
+
+            TestAssert.True(enabled.Single(adapter => adapter.Id == WifiId).IsActive, "Wi-Fi should be on");
+            TestAssert.True(
+                enabled.Single(adapter => adapter.Id == EthernetId).IsActive,
+                "Ethernet should still remain on");
+            TestAssert.True(radio.States[WifiId].SoftwareOn, "Wi-Fi radio should be restored to on");
+            TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet must never be toggled");
+        }
+    }
+
     private static async Task EnableOnlyFailureRollsBackAsync()
     {
         var (runner, radio, service) = CreateService(true, true, true);
@@ -320,6 +349,106 @@ internal static class TestProgram
             TestAssert.True(runner.Adapters[EthernetId].IsEnabled, "Ethernet should be restored");
             TestAssert.True(radio.States[WifiId].SoftwareOn, "Wi-Fi radio should be restored");
         }
+    }
+
+    private static async Task CycleSwitchesWithWraparoundAsync()
+    {
+        var (runner, _, service) = CreateService(true, true, false);
+        using (service)
+        {
+            var ethernetOnly = await service.CycleToNextAsync();
+
+            TestAssert.True(
+                ethernetOnly.Single(adapter => adapter.Id == EthernetId).IsActive,
+                "first cycle should wrap from Wi-Fi to alphabetically first Ethernet");
+            TestAssert.False(
+                ethernetOnly.Single(adapter => adapter.Id == WifiId).IsEnabled,
+                "first cycle should disable Wi-Fi");
+            TestAssert.Equal(1, ethernetOnly.Count(adapter => adapter.IsEnabled), "first enabled count");
+
+            var wifiOnly = await service.CycleToNextAsync();
+
+            TestAssert.True(
+                wifiOnly.Single(adapter => adapter.Id == WifiId).IsActive,
+                "second cycle should advance from Ethernet to Wi-Fi");
+            TestAssert.False(
+                wifiOnly.Single(adapter => adapter.Id == EthernetId).IsEnabled,
+                "second cycle should disable Ethernet");
+            TestAssert.Equal(1, wifiOnly.Count(adapter => adapter.IsEnabled), "second enabled count");
+            TestAssert.True(runner.Adapters[WifiId].IsEnabled, "Wi-Fi should finish enabled");
+        }
+    }
+
+    private static async Task LocalControlPipeServesRequestsAsync()
+    {
+        var (runner, _, service) = CreateService(true, true, false);
+        using (service)
+        using (var server = new NamedPipeControlServer(service))
+        {
+            server.Start();
+
+            using (var list = JsonDocument.Parse(
+                       await SendControlRequestAsync("""{"version":1,"command":"list"}""")))
+            {
+                TestAssert.True(list.RootElement.GetProperty("ok").GetBoolean(), "list should succeed");
+                TestAssert.Equal(
+                    2,
+                    list.RootElement.GetProperty("adapters").GetArrayLength(),
+                    "pipe adapter count");
+            }
+
+            using (var toggle = JsonDocument.Parse(
+                       await SendControlRequestAsync(
+                           $$"""{"version":1,"command":"toggle","adapterId":"{{WifiId:D}}"}""")))
+            {
+                TestAssert.True(toggle.RootElement.GetProperty("ok").GetBoolean(), "toggle should succeed");
+                TestAssert.False(runner.Adapters[WifiId].IsEnabled, "pipe toggle should disable Wi-Fi");
+                TestAssert.False(
+                    runner.Adapters[EthernetId].IsEnabled,
+                    "pipe toggle must not enable Ethernet");
+            }
+
+            using (var cycle = JsonDocument.Parse(
+                       await SendControlRequestAsync("""{"version":1,"command":"cycle"}""")))
+            {
+                TestAssert.True(cycle.RootElement.GetProperty("ok").GetBoolean(), "cycle should succeed");
+                TestAssert.True(
+                    runner.Adapters[EthernetId].IsEnabled,
+                    "pipe cycle should select alphabetically first Ethernet when none is active");
+                TestAssert.False(runner.Adapters[WifiId].IsEnabled, "pipe cycle should leave Wi-Fi disabled");
+            }
+
+            using var oversized = JsonDocument.Parse(
+                await SendControlRequestAsync(new string('x', 4097)));
+            TestAssert.False(
+                oversized.RootElement.GetProperty("ok").GetBoolean(),
+                "oversized request should be rejected");
+        }
+    }
+
+    private static async Task<string> SendControlRequestAsync(string request)
+    {
+        await using var pipe = new NamedPipeClientStream(
+            ".",
+            NamedPipeControlServer.PipeName,
+            PipeDirection.InOut,
+            PipeOptions.Asynchronous);
+        await pipe.ConnectAsync(5000);
+        await using var writer = new StreamWriter(
+            pipe,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            leaveOpen: true)
+        {
+            AutoFlush = true,
+        };
+        using var reader = new StreamReader(
+            pipe,
+            new UTF8Encoding(encoderShouldEmitUTF8Identifier: false),
+            detectEncodingFromByteOrderMarks: false,
+            leaveOpen: true);
+        await writer.WriteLineAsync(request);
+        return await reader.ReadLineAsync()
+            ?? throw new InvalidDataException("The local control server returned no response.");
     }
 
     private static (

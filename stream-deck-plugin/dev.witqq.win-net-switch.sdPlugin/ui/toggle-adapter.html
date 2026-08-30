@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <title>WinNetSwitch Adapter On/Off</title>
+    <meta charset="utf-8" />
+    <script src="sdpi-components.js"></script>
+  </head>
+  <body>
+    <sdpi-item label="Adapter">
+      <sdpi-select
+        setting="adapterId"
+        datasource="getAdapters"
+        loading="Loading adapters…"
+        placeholder="Select an adapter"
+        show-refresh>
+      </sdpi-select>
+    </sdpi-item>
+
+    <sdpi-item label="Required app">
+      <sdpi-button id="download-companion">Download WinNetSwitch</sdpi-button>
+    </sdpi-item>
+
+    <sdpi-item label="Help">
+      <sdpi-button id="open-support">Support and bug reports</sdpi-button>
+    </sdpi-item>
+
+    <script>
+      const downloadUrl = "https://github.com/witqq/win-net-switch/releases/latest/download/WinNetSwitch-Setup.exe";
+      const supportUrl = "https://github.com/witqq/win-net-switch/issues";
+
+      document.getElementById("download-companion").addEventListener("click", () => {
+        SDPIComponents.streamDeckClient.send("openUrl", { url: downloadUrl });
+      });
+      document.getElementById("open-support").addEventListener("click", () => {
+        SDPIComponents.streamDeckClient.send("openUrl", { url: supportUrl });
+      });
+    </script>
+  </body>
+</html>

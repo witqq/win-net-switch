@@ -76,6 +76,12 @@ internal static class Program
         }
 
         if (args.Length == 1 &&
+            string.Equals(args[0], "--ipc-smoke-test", StringComparison.OrdinalIgnoreCase))
+        {
+            return await NamedPipeControlServerSmokeTest.RunAsync();
+        }
+
+        if (args.Length == 1 &&
             string.Equals(args[0], "--probe-adapters", StringComparison.OrdinalIgnoreCase))
         {
             using var service = new PhysicalNetworkAdapterService(new PowerShellRunner());

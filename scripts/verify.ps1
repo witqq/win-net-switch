@@ -1,7 +1,9 @@
 param(
     [switch]$SkipSmoke,
 
-    [string]$DotNet = "dotnet"
+    [string]$DotNet = "dotnet",
+
+    [string]$Npm = "npm"
 )
 
 $ErrorActionPreference = "Stop"
@@ -11,6 +13,8 @@ $tests = Join-Path $projectRoot "tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csp
 $publishScript = Join-Path $PSScriptRoot "publish.ps1"
 $publishedExecutable = Join-Path $projectRoot "artifacts\publish\win-x64\WinNetSwitch.exe"
 $setupExecutable = Join-Path $projectRoot "artifacts\setup\win-x64\WinNetSwitch-Setup.exe"
+$pluginRoot = Join-Path $projectRoot "stream-deck-plugin"
+$pluginPackageVerificationScript = Join-Path $PSScriptRoot "test-stream-deck-package.ps1"
 
 function Invoke-PublishedAppMode {
     param(
@@ -42,6 +46,29 @@ try {
     & $DotNet run --project $tests --configuration Release --no-restore
     if ($LASTEXITCODE -ne 0) { throw "Test runner failed with exit code $LASTEXITCODE." }
 
+    Push-Location $pluginRoot
+    try {
+        & $Npm ci
+        if ($LASTEXITCODE -ne 0) { throw "npm ci failed with exit code $LASTEXITCODE." }
+
+        & $Npm run typecheck
+        if ($LASTEXITCODE -ne 0) { throw "Plugin typecheck failed with exit code $LASTEXITCODE." }
+
+        & $Npm test
+        if ($LASTEXITCODE -ne 0) { throw "Plugin tests failed with exit code $LASTEXITCODE." }
+
+        & $Npm run package
+        if ($LASTEXITCODE -ne 0) { throw "Plugin packaging failed with exit code $LASTEXITCODE." }
+
+        & $Npm run validate
+        if ($LASTEXITCODE -ne 0) { throw "Plugin validation failed with exit code $LASTEXITCODE." }
+
+        & $pluginPackageVerificationScript
+    }
+    finally {
+        Pop-Location
+    }
+
     & $publishScript -Runtime win-x64 -DotNet $DotNet
 
     if (-not $SkipSmoke) {
@@ -67,6 +94,11 @@ try {
             -Argument "--smoke-test" `
             -Description "Native tray smoke test"
         Write-Host "Native tray smoke test passed without invoking the production network service."
+
+        Invoke-PublishedAppMode `
+            -Argument "--ipc-smoke-test" `
+            -Description "Local control pipe smoke test"
+        Write-Host "Local control pipe smoke test passed with a fake network service."
 
         $setupProcess = Start-Process `
             -FilePath $setupExecutable `

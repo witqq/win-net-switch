@@ -167,8 +167,23 @@ internal static class TraySmokeTest
             throw new InvalidOperationException("Smoke mode must never switch a real or fake adapter.");
         }
 
+        public Task<IReadOnlyList<PhysicalNetworkAdapter>> ToggleAdapterAsync(
+            Guid targetAdapterId,
+            CancellationToken cancellationToken = default)
+        {
+            SwitchCalls++;
+            throw new InvalidOperationException("Smoke mode must never switch a real or fake adapter.");
+        }
+
         public Task<IReadOnlyList<PhysicalNetworkAdapter>> EnableOnlyAsync(
             Guid targetAdapterId,
+            CancellationToken cancellationToken = default)
+        {
+            SwitchCalls++;
+            throw new InvalidOperationException("Smoke mode must never switch a real or fake adapter.");
+        }
+
+        public Task<IReadOnlyList<PhysicalNetworkAdapter>> CycleToNextAsync(
             CancellationToken cancellationToken = default)
         {
             SwitchCalls++;

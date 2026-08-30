@@ -96,6 +96,37 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
         }
     }
 
+    public async Task<IReadOnlyList<PhysicalNetworkAdapter>> ToggleAdapterAsync(
+        Guid targetAdapterId,
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (targetAdapterId == Guid.Empty)
+        {
+            throw new ArgumentException("Adapter ID cannot be empty.", nameof(targetAdapterId));
+        }
+
+        await _toggleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var initialState = GetRecentSnapshot() ??
+                await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
+            var initialTarget = initialState.SingleOrDefault(adapter => adapter.Id == targetAdapterId)
+                ?? throw new NetworkSwitchException(
+                    $"Physical network adapter {targetAdapterId:D} is no longer available. Refresh the list.");
+            return await SetAdapterEnabledCoreAsync(
+                    targetAdapterId,
+                    enabled: !initialTarget.IsActive,
+                    cancellationToken,
+                    initialTarget)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _toggleLock.Release();
+        }
+    }
+
     public async Task<IReadOnlyList<PhysicalNetworkAdapter>> EnableOnlyAsync(
         Guid targetAdapterId,
         CancellationToken cancellationToken = default)
@@ -107,10 +138,57 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
         }
 
         await _toggleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            return await EnableOnlyCoreAsync(targetAdapterId, cancellationToken).ConfigureAwait(false);
+        }
+        finally
+        {
+            _toggleLock.Release();
+        }
+    }
+
+    public async Task<IReadOnlyList<PhysicalNetworkAdapter>> CycleToNextAsync(
+        CancellationToken cancellationToken = default)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        await _toggleLock.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            var initialState = GetRecentSnapshot() ??
+                await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
+            var orderedAdapters = initialState
+                .OrderBy(adapter => adapter.Name, StringComparer.OrdinalIgnoreCase)
+                .ThenBy(adapter => adapter.Id)
+                .ToArray();
+            if (orderedAdapters.Length == 0)
+            {
+                throw new NetworkSwitchException("No physical network adapters are available to cycle.");
+            }
+
+            var activeIndex = Array.FindIndex(orderedAdapters, adapter => adapter.IsActive);
+            var nextIndex = activeIndex < 0 ? 0 : (activeIndex + 1) % orderedAdapters.Length;
+            return await EnableOnlyCoreAsync(
+                    orderedAdapters[nextIndex].Id,
+                    cancellationToken,
+                    initialState)
+                .ConfigureAwait(false);
+        }
+        finally
+        {
+            _toggleLock.Release();
+        }
+    }
+
+    private async Task<IReadOnlyList<PhysicalNetworkAdapter>> EnableOnlyCoreAsync(
+        Guid targetAdapterId,
+        CancellationToken cancellationToken,
+        IReadOnlyList<PhysicalNetworkAdapter>? knownInitialState = null)
+    {
         IReadOnlyList<PhysicalNetworkAdapter>? initialState = null;
         try
         {
-            initialState = GetRecentSnapshot() ??
+            initialState = knownInitialState ?? GetRecentSnapshot() ??
                 await GetPhysicalAdaptersAsync(cancellationToken).ConfigureAwait(false);
             var initialTarget = initialState.SingleOrDefault(adapter => adapter.Id == targetAdapterId)
                 ?? throw new NetworkSwitchException(
@@ -141,10 +219,9 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
                     .ConfigureAwait(false);
             }
 
-            var finalState = currentState;
-            return finalState.Count(adapter => adapter.IsEnabled) == 1 &&
-                   finalState.Any(adapter => IsSameDevice(adapter, enabledTarget) && adapter.IsActive)
-                ? finalState
+            return currentState.Count(adapter => adapter.IsEnabled) == 1 &&
+                   currentState.Any(adapter => IsSameDevice(adapter, enabledTarget) && adapter.IsActive)
+                ? currentState
                 : throw new NetworkSwitchException(
                     $"Windows did not confirm that “{initialTarget.Name}” is the only enabled adapter.");
         }
@@ -166,10 +243,6 @@ public sealed class PhysicalNetworkAdapterService : INetworkAdapterService, IDis
             throw new NetworkSwitchException(
                 $"Could not enable only the selected adapter. {rollbackStatus} Cause: {exception.Message}",
                 exception);
-        }
-        finally
-        {
-            _toggleLock.Release();
         }
     }
 

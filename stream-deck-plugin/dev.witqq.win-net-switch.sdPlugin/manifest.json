@@ -3,7 +3,7 @@
   "Name": "WinNetSwitch",
   "Version": "1.0.1.0",
   "Author": "witqq",
-  "Description": "Control physical Windows network adapters from Stream Deck. Requires the separately installed WinNetSwitch companion application.",
+  "Description": "Control physical Windows network adapters from Stream Deck. Requires the separately installed WinNetSwitch companion App.",
   "UUID": "dev.witqq.win-net-switch",
   "SDKVersion": 3,
   "Software": {

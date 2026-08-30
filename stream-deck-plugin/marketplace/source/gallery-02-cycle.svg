@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="960" viewBox="0 0 1920 960">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="960" gradientUnits="userSpaceOnUse"><stop stop-color="#111827"/><stop offset="1" stop-color="#172554"/></linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#020617" flood-opacity="0.5"/></filter>
+    <symbol id="cycle" viewBox="0 0 144 144">
+      <rect width="144" height="144" rx="24" fill="#1d4ed8"/>
+      <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="10"><path d="M36 58a40 40 0 0 1 72-12l10 12m-7-25 7 25-25 5"/><path d="M108 86a40 40 0 0 1-72 12L26 86m7 25-7-25 25-5"/></g>
+    </symbol>
+  </defs>
+  <rect width="1920" height="960" fill="url(#bg)"/>
+  <text x="120" y="150" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="700">Cycle to the next adapter</text>
+  <text x="124" y="215" fill="#bfdbfe" font-family="Segoe UI, Arial, sans-serif" font-size="34">Enable the next physical adapter · Disable the rest</text>
+  <g transform="translate(135 355)" filter="url(#shadow)">
+    <rect width="410" height="260" rx="42" fill="#0f766e" stroke="#34d399" stroke-width="4"/>
+    <circle cx="80" cy="82" r="25" fill="#a7f3d0"/>
+    <text x="125" y="94" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="650">Ethernet</text>
+    <text x="80" y="175" fill="#d1fae5" font-family="Segoe UI, Arial, sans-serif" font-size="28">Active now</text>
+  </g>
+  <path d="M605 485h170m-46-46 46 46-46 46" fill="none" stroke="#60a5fa" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(830 355)" filter="url(#shadow)">
+    <rect width="410" height="260" rx="42" fill="#1d4ed8" stroke="#60a5fa" stroke-width="4"/>
+    <circle cx="80" cy="82" r="25" fill="#bfdbfe"/>
+    <text x="125" y="94" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="650">Wi-Fi</text>
+    <text x="80" y="175" fill="#dbeafe" font-family="Segoe UI, Arial, sans-serif" font-size="28">Next active</text>
+  </g>
+  <path d="M1300 485h120" fill="none" stroke="#64748b" stroke-width="12" stroke-linecap="round"/>
+  <g transform="translate(1480 355)" filter="url(#shadow)">
+    <rect width="310" height="260" rx="42" fill="#1f2937" stroke="#475569" stroke-width="3"/>
+    <use href="#cycle" x="83" y="35" width="144" height="144"/>
+    <text x="155" y="220" text-anchor="middle" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="26">One key press</text>
+  </g>
+  <path d="M1035 700c-130 120-505 125-690 20" fill="none" stroke="#3b82f6" stroke-width="8" stroke-dasharray="18 18" opacity="0.7"/>
+  <text x="120" y="872" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="30">Deterministic name order with wraparound after the last adapter.</text>
+</svg>

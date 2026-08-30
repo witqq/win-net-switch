@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="960" viewBox="0 0 1920 960">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="60" x2="1800" y2="900" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#111827"/>
+      <stop offset="0.55" stop-color="#172554"/>
+      <stop offset="1" stop-color="#064e3b"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%">
+      <feDropShadow dx="0" dy="20" stdDeviation="24" flood-color="#020617" flood-opacity="0.5"/>
+    </filter>
+    <linearGradient id="logo-background" x1="48" y1="48" x2="464" y2="464">
+      <stop stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#0f766e"/>
+    </linearGradient>
+    <symbol id="logo" viewBox="0 0 512 512">
+      <rect width="512" height="512" rx="112" fill="url(#logo-background)"/>
+      <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="34">
+        <circle cx="142" cy="256" r="52"/><circle cx="370" cy="150" r="52"/><circle cx="370" cy="362" r="52"/>
+        <path d="M190 235l130-61M190 277l130 61"/>
+      </g>
+      <path d="M225 90h94l-26-26m26 26-26 26M287 422h-94l26 26m-26-26 26-26" fill="none" stroke="#a7f3d0" stroke-width="24" stroke-linecap="round" stroke-linejoin="round"/>
+    </symbol>
+    <symbol id="toggle-on" viewBox="0 0 144 144">
+      <rect width="144" height="144" rx="24" fill="#0f766e"/><rect x="24" y="38" width="96" height="52" rx="26" fill="#34d399"/><circle cx="94" cy="64" r="20" fill="#fff"/>
+    </symbol>
+    <symbol id="cycle" viewBox="0 0 144 144">
+      <rect width="144" height="144" rx="24" fill="#1d4ed8"/>
+      <g fill="none" stroke="#fff" stroke-linecap="round" stroke-linejoin="round" stroke-width="10">
+        <path d="M36 58a40 40 0 0 1 72-12l10 12m-7-25 7 25-25 5"/><path d="M108 86a40 40 0 0 1-72 12L26 86m7 25-7-25 25-5"/>
+      </g>
+    </symbol>
+  </defs>
+  <rect width="1920" height="960" fill="url(#bg)"/>
+  <circle cx="1760" cy="90" r="340" fill="#2563eb" opacity="0.12"/>
+  <circle cx="1420" cy="930" r="430" fill="#10b981" opacity="0.1"/>
+  <use href="#logo" x="120" y="148" width="300" height="300" filter="url(#shadow)"/>
+  <text x="120" y="548" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="102" font-weight="700">WinNetSwitch</text>
+  <text x="126" y="630" fill="#bfdbfe" font-family="Segoe UI, Arial, sans-serif" font-size="42">Switch Windows network adapters</text>
+  <text x="126" y="684" fill="#bfdbfe" font-family="Segoe UI, Arial, sans-serif" font-size="42">from Stream Deck</text>
+  <g transform="translate(1000 190)" filter="url(#shadow)">
+    <rect width="300" height="420" rx="42" fill="#0b1220" stroke="#334155" stroke-width="3"/>
+    <use href="#toggle-on" x="62" y="50" width="176" height="176"/>
+    <text x="150" y="285" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="650">Adapter</text>
+    <text x="150" y="330" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="650">On/Off</text>
+    <text x="150" y="378" text-anchor="middle" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="24">One adapter</text>
+  </g>
+  <g transform="translate(1360 190)" filter="url(#shadow)">
+    <rect width="300" height="420" rx="42" fill="#0b1220" stroke="#334155" stroke-width="3"/>
+    <use href="#cycle" x="62" y="50" width="176" height="176"/>
+    <text x="150" y="285" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="650">Cycle</text>
+    <text x="150" y="330" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="34" font-weight="650">Adapters</text>
+    <text x="150" y="378" text-anchor="middle" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="24">One active</text>
+  </g>
+  <rect x="1000" y="665" width="660" height="104" rx="26" fill="#0f172a" stroke="#475569" stroke-width="2"/>
+  <text x="1330" y="730" text-anchor="middle" fill="#dbeafe" font-family="Segoe UI, Arial, sans-serif" font-size="30">Windows 10/11 · Stream Deck 7.1+</text>
+  <text x="120" y="884" fill="#a7f3d0" font-family="Segoe UI, Arial, sans-serif" font-size="28">Free companion App required · Local control · No telemetry</text>
+</svg>

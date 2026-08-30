@@ -1,0 +1,34 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="960" viewBox="0 0 1920 960">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1920" y2="960" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0f172a"/>
+      <stop offset="1" stop-color="#052e2b"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="160%"><feDropShadow dx="0" dy="18" stdDeviation="20" flood-color="#020617" flood-opacity="0.5"/></filter>
+    <symbol id="toggle-off" viewBox="0 0 144 144"><rect width="144" height="144" rx="24" fill="#292d35"/><rect x="24" y="38" width="96" height="52" rx="26" fill="#4b5563"/><circle cx="50" cy="64" r="20" fill="#d1d5db"/></symbol>
+    <symbol id="toggle-on" viewBox="0 0 144 144"><rect width="144" height="144" rx="24" fill="#0f766e"/><rect x="24" y="38" width="96" height="52" rx="26" fill="#34d399"/><circle cx="94" cy="64" r="20" fill="#fff"/></symbol>
+  </defs>
+  <rect width="1920" height="960" fill="url(#bg)"/>
+  <text x="120" y="150" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="78" font-weight="700">Toggle one adapter</text>
+  <text x="124" y="215" fill="#a7f3d0" font-family="Segoe UI, Arial, sans-serif" font-size="34">Other physical adapters stay unchanged</text>
+  <g transform="translate(170 320)" filter="url(#shadow)">
+    <rect width="470" height="400" rx="48" fill="#111827" stroke="#475569" stroke-width="3"/>
+    <use href="#toggle-off" x="135" y="54" width="200" height="200"/>
+    <text x="235" y="315" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="650">Wi-Fi · Off</text>
+    <text x="235" y="360" text-anchor="middle" fill="#94a3b8" font-family="Segoe UI, Arial, sans-serif" font-size="25">Selected adapter</text>
+  </g>
+  <path d="M700 520h190m-48-48 48 48-48 48" fill="none" stroke="#34d399" stroke-width="18" stroke-linecap="round" stroke-linejoin="round"/>
+  <g transform="translate(950 320)" filter="url(#shadow)">
+    <rect width="470" height="400" rx="48" fill="#111827" stroke="#34d399" stroke-width="4"/>
+    <use href="#toggle-on" x="135" y="54" width="200" height="200"/>
+    <text x="235" y="315" text-anchor="middle" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="42" font-weight="650">Wi-Fi · On</text>
+    <text x="235" y="360" text-anchor="middle" fill="#a7f3d0" font-family="Segoe UI, Arial, sans-serif" font-size="25">Key feedback confirms success</text>
+  </g>
+  <g transform="translate(1500 365)">
+    <rect width="290" height="110" rx="24" fill="#172554" stroke="#3b82f6" stroke-width="3"/>
+    <circle cx="54" cy="55" r="18" fill="#34d399"/>
+    <text x="88" y="48" fill="#ffffff" font-family="Segoe UI, Arial, sans-serif" font-size="26" font-weight="600">Ethernet</text>
+    <text x="88" y="78" fill="#93c5fd" font-family="Segoe UI, Arial, sans-serif" font-size="21">Still on</text>
+  </g>
+  <text x="120" y="872" fill="#cbd5e1" font-family="Segoe UI, Arial, sans-serif" font-size="30">Adapter On/Off changes only the adapter selected in Property Inspector.</text>
+</svg>

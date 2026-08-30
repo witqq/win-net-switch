@@ -389,12 +389,13 @@ internal static class TestProgram
             return Task.CompletedTask;
         }
 
-        var security = LocalControlPipeFactory.CreateWindowsSecurityForCurrentLogon();
-        var owner = security.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier
-            ?? throw new InvalidOperationException("The pipe owner SID was not returned.");
         using var identity = WindowsIdentity.GetCurrent();
         var userSid = identity.User
             ?? throw new InvalidOperationException("The current user SID was not returned.");
+        var testLogonSid = new SecurityIdentifier("S-1-5-5-123-456");
+        var security = LocalControlPipeFactory.CreateWindowsSecurity(userSid, testLogonSid);
+        var owner = security.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier
+            ?? throw new InvalidOperationException("The pipe owner SID was not returned.");
         TestAssert.Equal(userSid.Value, owner.Value, "pipe owner SID");
 
         var rules = security.GetAccessRules(
@@ -405,9 +406,7 @@ internal static class TestProgram
             .ToArray();
         TestAssert.Equal(1, rules.Length, "explicit pipe access rule count");
         var allowedSid = (SecurityIdentifier)rules[0].IdentityReference;
-        TestAssert.True(
-            allowedSid.IsWellKnown(WellKnownSidType.LogonIdsSid),
-            "the only pipe rule should target the current logon SID");
+        TestAssert.Equal(testLogonSid.Value, allowedSid.Value, "pipe logon SID");
         TestAssert.Equal(AccessControlType.Allow, rules[0].AccessControlType, "pipe rule type");
         TestAssert.Equal(PipeAccessRights.FullControl, rules[0].PipeAccessRights, "pipe rights");
 
@@ -428,6 +427,7 @@ internal static class TestProgram
         using (service)
         using (var server = new NamedPipeControlServer(
                    service,
+                   LocalControlPipeFactory.CreateForCurrentUserSmoke,
                    logError: (message, exception) =>
                        serverErrors.Add($"{message} {exception.Message}"),
                    notify: notifications.Add))

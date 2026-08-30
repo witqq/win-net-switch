@@ -27,10 +27,39 @@ internal static class LocalControlPipeFactory
         return CreateWindowsPipe(pipeName);
     }
 
+    internal static NamedPipeServerStream CreateForCurrentUserSmoke(string pipeName)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            return Create(pipeName);
+        }
+
+        using var identity = WindowsIdentity.GetCurrent();
+        var userSid = identity.User
+            ?? throw new InvalidOperationException("The current Windows user SID is unavailable.");
+        return CreateWindowsPipe(pipeName, userSid);
+    }
+
     [SupportedOSPlatform("windows")]
     private static NamedPipeServerStream CreateWindowsPipe(string pipeName)
     {
-        var security = CreateWindowsSecurityForCurrentLogon();
+        using var identity = WindowsIdentity.GetCurrent();
+        var logonSid = identity.Groups?
+            .OfType<SecurityIdentifier>()
+            .FirstOrDefault(group => group.IsWellKnown(WellKnownSidType.LogonIdsSid))
+            ?? throw new InvalidOperationException("The current Windows logon SID is unavailable.");
+        return CreateWindowsPipe(pipeName, logonSid);
+    }
+
+    [SupportedOSPlatform("windows")]
+    private static NamedPipeServerStream CreateWindowsPipe(
+        string pipeName,
+        SecurityIdentifier accessSid)
+    {
+        using var identity = WindowsIdentity.GetCurrent();
+        var ownerSid = identity.User
+            ?? throw new InvalidOperationException("The current Windows user SID is unavailable.");
+        var security = CreateWindowsSecurity(ownerSid, accessSid);
 
         var pipe = NamedPipeServerStreamAcl.Create(
             pipeName,
@@ -56,24 +85,18 @@ internal static class LocalControlPipeFactory
     }
 
     [SupportedOSPlatform("windows")]
-    internal static PipeSecurity CreateWindowsSecurityForCurrentLogon()
+    internal static PipeSecurity CreateWindowsSecurity(
+        SecurityIdentifier ownerSid,
+        SecurityIdentifier accessSid)
     {
-        using var identity = WindowsIdentity.GetCurrent();
-        var userSid = identity.User
-            ?? throw new InvalidOperationException("The current Windows user SID is unavailable.");
-        var logonSid = identity.Groups?
-            .OfType<SecurityIdentifier>()
-            .FirstOrDefault(group => group.IsWellKnown(WellKnownSidType.LogonIdsSid))
-            ?? throw new InvalidOperationException("The current Windows logon SID is unavailable.");
-
         var security = new PipeSecurity();
-        security.SetOwner(userSid);
+        security.SetOwner(ownerSid);
         // A logon SID is unique to this interactive sign-in. Unlike a user SID, it does not
         // grant access to another local session or a remote logon by the same account.
         // Do not replace this with PipeOptions.CurrentUserOnly: on Windows that option derives
         // its ACL from Token.Owner, which can be Administrators for an elevated process.
         security.AddAccessRule(new PipeAccessRule(
-            logonSid,
+            accessSid,
             PipeAccessRights.FullControl,
             AccessControlType.Allow));
         return security;

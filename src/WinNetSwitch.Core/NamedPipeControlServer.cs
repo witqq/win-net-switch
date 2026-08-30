@@ -20,6 +20,7 @@ public sealed class NamedPipeControlServer : IDisposable
     private readonly Action<string> _logInfo;
     private readonly Action<string, Exception> _logError;
     private readonly Action<NetworkControlNotification> _notify;
+    private readonly Func<string, NamedPipeServerStream> _pipeFactory;
     private readonly CancellationTokenSource _stopSource = new();
     private Task? _serverTask;
     private bool _disposed;
@@ -29,8 +30,24 @@ public sealed class NamedPipeControlServer : IDisposable
         Action<string>? logInfo = null,
         Action<string, Exception>? logError = null,
         Action<NetworkControlNotification>? notify = null)
+        : this(
+            adapterService,
+            LocalControlPipeFactory.Create,
+            logInfo,
+            logError,
+            notify)
+    {
+    }
+
+    internal NamedPipeControlServer(
+        INetworkAdapterService adapterService,
+        Func<string, NamedPipeServerStream> pipeFactory,
+        Action<string>? logInfo = null,
+        Action<string, Exception>? logError = null,
+        Action<NetworkControlNotification>? notify = null)
     {
         _adapterService = adapterService ?? throw new ArgumentNullException(nameof(adapterService));
+        _pipeFactory = pipeFactory ?? throw new ArgumentNullException(nameof(pipeFactory));
         _logInfo = logInfo ?? (_ => { });
         _logError = logError ?? ((_, _) => { });
         _notify = notify ?? (_ => { });
@@ -44,7 +61,7 @@ public sealed class NamedPipeControlServer : IDisposable
             throw new InvalidOperationException("The local control server is already running.");
         }
 
-        var initialPipe = LocalControlPipeFactory.Create(PipeName);
+        var initialPipe = _pipeFactory(PipeName);
         _serverTask = Task.Run(() => RunAsync(initialPipe, _stopSource.Token));
         _logInfo($"Local control server started. Pipe: {PipeName}.");
     }
@@ -81,7 +98,7 @@ public sealed class NamedPipeControlServer : IDisposable
         {
             try
             {
-                await using var pipe = initialPipeToUse ?? LocalControlPipeFactory.Create(PipeName);
+                await using var pipe = initialPipeToUse ?? _pipeFactory(PipeName);
                 initialPipeToUse = null;
                 await pipe.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
                 await HandleConnectionAsync(pipe, cancellationToken).ConfigureAwait(false);

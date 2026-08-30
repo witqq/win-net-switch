@@ -13,7 +13,9 @@ internal static class NamedPipeControlServerSmokeTest
     internal static async Task<int> RunAsync()
     {
         var service = new SmokeNetworkAdapterService();
-        using var server = new NamedPipeControlServer(service);
+        using var server = new NamedPipeControlServer(
+            service,
+            LocalControlPipeFactory.CreateForCurrentUserSmoke);
         server.Start();
 
         var list = await SendAsync("""{"version":1,"command":"list"}""");

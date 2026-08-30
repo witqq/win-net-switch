@@ -153,6 +153,7 @@ GitHub Actions автоматически выполняет [CI](https://github
 Подробности:
 
 - [как предложить изменение](CONTRIBUTING.md);
+- [правила сообщества](CODE_OF_CONDUCT.md);
 - [как выпустить новую версию](docs/RELEASING.md);
 - [как сообщить об уязвимости](SECURITY.md);
 - [лицензия MIT](LICENSE).

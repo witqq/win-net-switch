@@ -2,7 +2,7 @@
 
 Спасибо за интерес к WinNetSwitch.
 
-Перед изменением кода проверьте [существующие Issues](https://github.com/witqq/win-net-switch/issues). Для ошибки используйте [bug report](https://github.com/witqq/win-net-switch/issues/new?template=bug_report.yml), для новой возможности — [feature request](https://github.com/witqq/win-net-switch/issues/new?template=feature_request.yml). Уязвимости не публикуйте в Issues: следуйте [политике безопасности](SECURITY.md).
+Перед изменением кода ознакомьтесь с [правилами сообщества](CODE_OF_CONDUCT.md) и проверьте [существующие Issues](https://github.com/witqq/win-net-switch/issues). Для ошибки используйте [bug report](https://github.com/witqq/win-net-switch/issues/new?template=bug_report.yml), для новой возможности — [feature request](https://github.com/witqq/win-net-switch/issues/new?template=feature_request.yml). Уязвимости не публикуйте в Issues: следуйте [политике безопасности](SECURITY.md).
 
 ## Подготовка окружения
 

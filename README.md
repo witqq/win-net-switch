@@ -16,6 +16,7 @@ The application interface, installer, errors, and diagnostic messages are in Eng
 |---|---|
 | [WinNetSwitch-Setup.exe](https://github.com/witqq/win-net-switch/releases/latest/download/WinNetSwitch-Setup.exe) | Recommended installer with automatic startup and standard uninstallation |
 | [WinNetSwitch.exe](https://github.com/witqq/win-net-switch/releases/latest/download/WinNetSwitch.exe) | Portable self-contained build without installation or automatic startup |
+| [dev.witqq.win-net-switch.streamDeckPlugin](https://github.com/witqq/win-net-switch/releases/latest/download/dev.witqq.win-net-switch.streamDeckPlugin) | Optional Stream Deck plugin; requires the WinNetSwitch application above |
 | [SHA256SUMS.txt](https://github.com/witqq/win-net-switch/releases/latest/download/SHA256SUMS.txt) | Checksums for the published files |
 
 All versions and release notes are available on the [GitHub Releases](https://github.com/witqq/win-net-switch/releases) page.
@@ -54,7 +55,7 @@ $actual = (Get-FileHash .\WinNetSwitch-Setup.exe -Algorithm SHA256).Hash.ToLower
 $actual -eq $expected
 ```
 
-`True` means the checksum matches. Replace the file name with `WinNetSwitch.exe` to verify the portable build.
+`True` means the checksum matches. Replace the file name with `WinNetSwitch.exe` or `dev.witqq.win-net-switch.streamDeckPlugin` to verify another release asset.
 
 ## Usage
 
@@ -71,6 +72,19 @@ A check mark next to an adapter indicates its final enabled state. For Wi-Fi, th
 The adapter list refreshes in the background. While the menu is open, its items are kept stable so the focus is not reset; refreshed state appears after closing and reopening the menu. Use `Refresh` or double-click the tray icon to request a manual refresh.
 
 > **Important:** disabling an active adapter immediately interrupts its network connections, downloads, and remote sessions. `Enable only this adapter` intentionally disables every other physical interface. Do not use it on an adapter through which you are remotely controlling the computer.
+
+## Stream Deck plugin
+
+The optional plugin provides two Windows-only Stream Deck actions:
+
+- `Adapter On/Off` toggles only the physical adapter selected in its Property Inspector;
+- `Cycle Adapters` enables only the next physical adapter in case-insensitive name order and disables the others. It wraps to the first adapter after the last one; if none is active, it selects the first one.
+
+The plugin is deliberately small and does **not** contain WinNetSwitch. Install and start the current [WinNetSwitch companion](https://github.com/witqq/win-net-switch/releases/latest/download/WinNetSwitch-Setup.exe) first. Then download and double-click `dev.witqq.win-net-switch.streamDeckPlugin`, approve installation in Stream Deck, and add either action to a key. `Adapter On/Off` exposes an adapter selector, a refresh control, and direct Download and Support buttons.
+
+The key title and image show the selected adapter state, the active adapter after cycling, progress, or an actionable missing-companion error. Stream Deck 7.1 or later is required. Until the Marketplace listing is approved, install the plugin directly from the GitHub Release.
+
+See the complete [Stream Deck plugin and Marketplace guide](docs/STREAM_DECK.md) and [privacy policy](PRIVACY.md).
 
 ## How Wi-Fi control works
 
@@ -124,17 +138,18 @@ The uninstaller removes the application, automatic startup task, shortcut, Insta
 - the public release targets Windows x64; build ARM64 locally with `scripts\publish.ps1 -Runtime win-arm64`;
 - no installed .NET runtime is required because the application is self-contained.
 
-Building from source requires the supported .NET 10 LTS SDK. The project has no third-party NuGet dependencies.
+Building from source requires the supported .NET 10 LTS SDK. Stream Deck plugin development additionally requires Node.js 24 through a version manager and npm. The .NET projects have no third-party NuGet dependencies.
 
 ## Development
 
-The solution contains five projects:
+The repository contains five .NET projects and one Stream Deck plugin:
 
 - `src\WinNetSwitch.Core` — models, PowerShell runner, Native Wi-Fi API, and transactional operations;
 - `src\WinNetSwitch.App` — Windows Forms `ApplicationContext`, `NotifyIcon`, and tray menu;
 - `src\WinNetSwitch.Windows` — installation, uninstallation, shortcut, and Task Scheduler startup;
 - `src\WinNetSwitch.Setup` — self-contained GUI installer with an embedded payload;
-- `tests\WinNetSwitch.Tests` — executable tests without an external test framework.
+- `tests\WinNetSwitch.Tests` — executable tests without an external test framework;
+- `stream-deck-plugin` — TypeScript Stream Deck plugin, Property Inspector, icons, tests, and manifest.
 
 On Windows with the SDK specified by `global.json`, run:
 
@@ -144,21 +159,35 @@ dotnet build .\WinNetSwitch.slnx --configuration Release --no-restore
 dotnet run --project .\tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj --configuration Release --no-restore
 ```
 
-The complete local verification requires an elevated PowerShell session. It performs a Release build, 15 tests, self-contained publication, a read-only probe of real adapters, the native tray smoke test, and installer payload validation:
+Build and validate the plugin with Node.js 24:
+
+```powershell
+cd .\stream-deck-plugin
+npm ci
+npm run typecheck
+npm test
+npm run package
+```
+
+The package is written to `artifacts\stream-deck\dev.witqq.win-net-switch.streamDeckPlugin`. The official Elgato CLI validates the manifest and file structure while packaging. `scripts\test-stream-deck-package.ps1` additionally rejects application executables or scripts inside the plugin archive.
+
+The complete local verification requires an elevated PowerShell session. It performs a Release build, 18 .NET tests, plugin dependency installation, typechecking and tests, Stream Deck validation and packaging, self-contained application publication, a read-only probe of real adapters, native tray and local-control-pipe smoke tests, and installer payload validation:
 
 ```powershell
 .\scripts\verify.ps1
 ```
 
-Use `-SkipSmoke` in environments without an interactive desktop. Outputs are written to `artifacts\publish\win-x64` and `artifacts\setup\win-x64`.
+Use `-SkipSmoke` in environments without an interactive desktop. Outputs are written below `artifacts\publish\win-x64`, `artifacts\setup\win-x64`, and `artifacts\stream-deck`.
 
-GitHub Actions runs [CI](https://github.com/witqq/win-net-switch/actions/workflows/ci.yml) for `main` and pull requests. A `vMAJOR.MINOR.PATCH` tag starts the [Release workflow](https://github.com/witqq/win-net-switch/actions/workflows/release.yml), which rebuilds the project in the cloud and publishes the EXE, installer, and SHA-256 checksums.
+GitHub Actions runs [CI](https://github.com/witqq/win-net-switch/actions/workflows/ci.yml) for `main` and pull requests. A `vMAJOR.MINOR.PATCH` tag starts the [Release workflow](https://github.com/witqq/win-net-switch/actions/workflows/release.yml), which rebuilds the project in the cloud and publishes the EXE, installer, Stream Deck plugin, and SHA-256 checksums.
 
 Additional documentation:
 
 - [contribution guide](CONTRIBUTING.md);
 - [community code of conduct](CODE_OF_CONDUCT.md);
 - [release guide](docs/RELEASING.md);
+- [Stream Deck and Marketplace guide](docs/STREAM_DECK.md);
+- [privacy policy](PRIVACY.md);
 - [security policy](SECURITY.md);
 - [MIT license](LICENSE).
 

@@ -14,14 +14,15 @@ WinNetSwitch releases are created by GitHub Actions from an existing annotated `
    - `src\WinNetSwitch.App\app.manifest` — `assemblyIdentity`;
    - `src\WinNetSwitch.Setup\app.manifest` — `assemblyIdentity`.
 4. Update user documentation when behavior or requirements changed.
+5. If the Stream Deck plugin changed, increment its four-component version in `stream-deck-plugin\dev.witqq.win-net-switch.sdPlugin\manifest.json`. Its version is independent from the companion application version.
 
 A positive search must find the new version in every expected file:
 
 ```powershell
-rg -n "1\.3\.1" Directory.Build.props src\WinNetSwitch.Windows src\WinNetSwitch.App\app.manifest src\WinNetSwitch.Setup\app.manifest
+rg -n "1\.4\.1" Directory.Build.props src\WinNetSwitch.Windows src\WinNetSwitch.App\app.manifest src\WinNetSwitch.Setup\app.manifest
 ```
 
-Replace `1.3.1` with the actual release version.
+Replace `1.4.1` with the actual release version.
 
 ## Verification and publication
 
@@ -34,26 +35,27 @@ Run the complete local verification from an elevated PowerShell session:
 Commit the version change, push `main`, and wait for the `CI` workflow to pass. Only then create the tag:
 
 ```powershell
-git tag -a v1.3.1 -m "WinNetSwitch 1.3.1"
-git push origin v1.3.1
+git tag -a v1.4.1 -m "WinNetSwitch 1.4.1"
+git push origin v1.4.1
 ```
 
 The Release workflow:
 
 1. validates the tag format and project version;
-2. restores dependencies, builds the solution, and runs the tests;
-3. creates self-contained `WinNetSwitch.exe` and `WinNetSwitch-Setup.exe` files;
+2. restores .NET and npm dependencies, builds the solution and plugin, and runs all tests and native smoke checks;
+3. creates self-contained `WinNetSwitch.exe` and `WinNetSwitch-Setup.exe` files and the validated `dev.witqq.win-net-switch.streamDeckPlugin` package;
 4. creates `SHA256SUMS.txt`;
 5. publishes a GitHub Release with generated release notes.
 
 ## Published release verification
 
-Confirm that the Release contains exactly three files:
+Confirm that the Release contains exactly four files:
 
 - `WinNetSwitch-Setup.exe`;
 - `WinNetSwitch.exe`;
+- `dev.witqq.win-net-switch.streamDeckPlugin`;
 - `SHA256SUMS.txt`.
 
-Download `SHA256SUMS.txt` and compare it with the SHA-256 digest of both EXE files. Confirm that the Release is neither a draft nor a prerelease and points to the expected tag.
+Download `SHA256SUMS.txt` and compare it with the SHA-256 digest of both EXE files and the Stream Deck package. Run `scripts\test-stream-deck-package.ps1` against the downloaded plugin to confirm that no companion executable was embedded. Confirm that the Release is neither a draft nor a prerelease and points to the expected tag.
 
 Never move or reuse a published tag. If a release is defective, fix the source, increment the patch version, and publish a new tag.

@@ -6,3 +6,4 @@ artifacts/
 *.user
 *.suo
 TestResults/
+node_modules/

@@ -17,6 +17,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
     };
     private readonly Icon _trayIcon;
     private readonly NotifyIcon _notifyIcon;
+    private readonly NamedPipeControlServer? _controlServer;
     private IReadOnlyList<PhysicalNetworkAdapter> _adapters = [];
     private bool _mutationInProgress;
     private bool _refreshInProgress;
@@ -30,13 +31,24 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private bool _exiting;
 
     public TrayApplicationContext()
-        : this(new PhysicalNetworkAdapterService(new PowerShellRunner()))
+        : this(new PhysicalNetworkAdapterService(new PowerShellRunner()), startControlServer: true)
     {
     }
 
-    internal TrayApplicationContext(INetworkAdapterService adapterService)
+    internal TrayApplicationContext(
+        INetworkAdapterService adapterService,
+        bool startControlServer = false)
     {
         _adapterService = adapterService ?? throw new ArgumentNullException(nameof(adapterService));
+        if (startControlServer)
+        {
+            _controlServer = new NamedPipeControlServer(
+                _adapterService,
+                AppLogger.Info,
+                AppLogger.Error);
+            _controlServer.Start();
+        }
+
         _trayIcon = TrayIconFactory.Create();
         _notifyIcon = new NotifyIcon
         {
@@ -105,6 +117,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _lifetimeSource.Cancel();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
+            _controlServer?.Dispose();
             _deferredMenuRebuildTimer.Dispose();
             _menu.Dispose();
             _trayIcon.Dispose();
@@ -229,9 +242,8 @@ internal sealed class TrayApplicationContext : ApplicationContext
         string? statusAfterToggle = null;
         try
         {
-            _adapters = await _adapterService.SetAdapterEnabledAsync(
+            _adapters = await _adapterService.ToggleAdapterAsync(
                 adapter.Id,
-                requestedState,
                 _lifetimeSource.Token);
             _stateVersion++;
             AppLogger.Info(

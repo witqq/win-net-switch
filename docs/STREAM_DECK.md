@@ -4,7 +4,7 @@
 
 ## Architecture and dependency
 
-The Stream Deck plugin is a non-elevated Node.js client. It sends bounded JSON requests to the elevated WinNetSwitch tray application through the local `WinNetSwitch.Control.v1` named pipe. The pipe grants access only to the current interactive Windows logon SID, uses a medium mandatory-integrity label so the ordinary Stream Deck process can connect, and does not grant access to `Everyone`, another sign-in session, or a remote logon. Adapter discovery and mutations remain in `PhysicalNetworkAdapterService`; the plugin does not invoke PowerShell or Windows network APIs directly.
+The Stream Deck plugin is a non-elevated Node.js client. It sends bounded JSON requests to the elevated WinNetSwitch tray application through the local `WinNetSwitch.Control.v1` named pipe. The pipe grants access to the current Windows logon SID when that SID is present in the application token; elevated Task Scheduler tokens that omit it safely fall back to the current user SID. A medium mandatory-integrity label lets the ordinary Stream Deck process connect, and the pipe never grants access to `Everyone`. Adapter discovery and mutations remain in `PhysicalNetworkAdapterService`; the plugin does not invoke PowerShell or Windows network APIs directly.
 
 WinNetSwitch is a mandatory, separately installed companion. The `.streamDeckPlugin` package must not contain `WinNetSwitch.exe`, the installer, a DLL, MSI, PowerShell script, batch file, or command script. The plugin's Property Inspector and manifest provide these links:
 
@@ -38,7 +38,7 @@ Required tools:
 - Stream Deck 7.1 or later for interactive device testing;
 - the .NET 10 SDK for companion development.
 
-From `stream-deck-plugin` run:
+From the repository root, run `nvm use` on macOS/Linux so NVM reads `.nvmrc`; with nvm-windows, run `nvm use 24.20.0`. Then run the following from `stream-deck-plugin`:
 
 ```powershell
 npm ci

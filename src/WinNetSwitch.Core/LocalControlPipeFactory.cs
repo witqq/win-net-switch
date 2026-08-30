@@ -37,28 +37,36 @@ internal static class LocalControlPipeFactory
         using var identity = WindowsIdentity.GetCurrent();
         var userSid = identity.User
             ?? throw new InvalidOperationException("The current Windows user SID is unavailable.");
-        return CreateWindowsPipe(pipeName, userSid);
+        return CreateWindowsPipe(pipeName, userSid, userSid);
     }
 
     [SupportedOSPlatform("windows")]
     private static NamedPipeServerStream CreateWindowsPipe(string pipeName)
     {
         using var identity = WindowsIdentity.GetCurrent();
-        var logonSid = identity.Groups?
+        var ownerSid = identity.User
+            ?? throw new InvalidOperationException("The current Windows user SID is unavailable.");
+        var accessSid = ResolveAccessSid(ownerSid, identity.Groups);
+        return CreateWindowsPipe(pipeName, ownerSid, accessSid);
+    }
+
+    [SupportedOSPlatform("windows")]
+    internal static SecurityIdentifier ResolveAccessSid(
+        SecurityIdentifier ownerSid,
+        IEnumerable<IdentityReference>? groups) =>
+        groups?
             .OfType<SecurityIdentifier>()
             .FirstOrDefault(group => group.IsWellKnown(WellKnownSidType.LogonIdsSid))
-            ?? throw new InvalidOperationException("The current Windows logon SID is unavailable.");
-        return CreateWindowsPipe(pipeName, logonSid);
-    }
+        // Task Scheduler can omit the logon SID from an elevated interactive token. The user
+        // SID keeps the pipe private to that account without granting access to Everyone.
+        ?? ownerSid;
 
     [SupportedOSPlatform("windows")]
     private static NamedPipeServerStream CreateWindowsPipe(
         string pipeName,
+        SecurityIdentifier ownerSid,
         SecurityIdentifier accessSid)
     {
-        using var identity = WindowsIdentity.GetCurrent();
-        var ownerSid = identity.User
-            ?? throw new InvalidOperationException("The current Windows user SID is unavailable.");
         var security = CreateWindowsSecurity(ownerSid, accessSid);
 
         var pipe = NamedPipeServerStreamAcl.Create(
@@ -122,7 +130,7 @@ internal static class LocalControlPipeFactory
         {
             throw new Win32Exception(
                 Marshal.GetLastWin32Error(),
-                "Could not allow the current medium-integrity logon session to use the control pipe.");
+                "Could not allow the current medium-integrity user to use the control pipe.");
         }
     }
 

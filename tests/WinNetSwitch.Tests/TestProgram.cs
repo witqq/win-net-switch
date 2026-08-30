@@ -34,7 +34,7 @@ internal static class TestProgram
             ("Enable-only disables every other adapter", EnableOnlyDisablesOtherAdaptersAsync),
             ("Enable-only failure restores the initial state", EnableOnlyFailureRollsBackAsync),
             ("Cycle switches exclusively with deterministic wraparound", CycleSwitchesWithWraparoundAsync),
-            ("Windows control pipe is limited to the interactive logon", WindowsControlPipeIsLogonScopedAsync),
+            ("Windows control pipe prefers logon SID and safely falls back to user SID", WindowsControlPipeIsLogonScopedAsync),
             ("Local control pipe serves bounded list, toggle, and cycle requests", LocalControlPipeServesRequestsAsync),
         };
 
@@ -393,6 +393,17 @@ internal static class TestProgram
         var userSid = identity.User
             ?? throw new InvalidOperationException("The current user SID was not returned.");
         var testLogonSid = new SecurityIdentifier("S-1-5-5-123-456");
+        var resolvedLogonSid = LocalControlPipeFactory.ResolveAccessSid(
+            userSid,
+            new IdentityReference[] { testLogonSid });
+        TestAssert.Equal(testLogonSid.Value, resolvedLogonSid.Value, "resolved logon SID");
+        var fallbackSid = LocalControlPipeFactory.ResolveAccessSid(
+            userSid,
+            Array.Empty<IdentityReference>());
+        TestAssert.Equal(userSid.Value, fallbackSid.Value, "fallback user SID");
+        var nullGroupsFallbackSid = LocalControlPipeFactory.ResolveAccessSid(userSid, groups: null);
+        TestAssert.Equal(userSid.Value, nullGroupsFallbackSid.Value, "null groups fallback user SID");
+
         var security = LocalControlPipeFactory.CreateWindowsSecurity(userSid, testLogonSid);
         var owner = security.GetOwner(typeof(SecurityIdentifier)) as SecurityIdentifier
             ?? throw new InvalidOperationException("The pipe owner SID was not returned.");

@@ -1,7 +1,7 @@
 {
   "$schema": "https://schemas.elgato.com/streamdeck/plugins/manifest.json",
   "Name": "WinNetSwitch",
-  "Version": "1.0.0.0",
+  "Version": "1.0.1.0",
   "Author": "witqq",
   "Description": "Control physical Windows network adapters from Stream Deck. Requires the separately installed WinNetSwitch companion application.",
   "UUID": "dev.witqq.win-net-switch",

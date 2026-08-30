@@ -4,7 +4,7 @@
 
 ## Архитектура и обязательная зависимость
 
-Плагин Stream Deck — непривилегированный Node.js-клиент. Он отправляет ограниченные JSON-запросы elevated tray-приложению WinNetSwitch через локальный named pipe `WinNetSwitch.Control.v1`. Pipe разрешает доступ только SID текущего интерактивного входа Windows, использует mandatory integrity level `medium`, чтобы обычный процесс Stream Deck мог подключиться, и не открывает доступ для `Everyone`, другого сеанса входа или удалённого logon. Обнаружение и изменение адаптеров остаётся в `PhysicalNetworkAdapterService`; сам плагин не запускает PowerShell и не вызывает сетевые Windows API напрямую.
+Плагин Stream Deck — непривилегированный Node.js-клиент. Он отправляет ограниченные JSON-запросы elevated tray-приложению WinNetSwitch через локальный named pipe `WinNetSwitch.Control.v1`. Pipe разрешает доступ SID текущего входа Windows, если он присутствует в токене приложения; для elevated-токена Планировщика заданий без такого SID безопасно используется SID текущего пользователя. Mandatory integrity level `medium` позволяет обычному процессу Stream Deck подключиться, а доступ для `Everyone` не открывается. Обнаружение и изменение адаптеров остаётся в `PhysicalNetworkAdapterService`; сам плагин не запускает PowerShell и не вызывает сетевые Windows API напрямую.
 
 WinNetSwitch — обязательное, отдельно устанавливаемое companion-приложение. Пакет `.streamDeckPlugin` не должен содержать `WinNetSwitch.exe`, установщик, DLL, MSI, PowerShell, batch или command script. Property Inspector и manifest плагина содержат ссылки:
 
@@ -38,7 +38,7 @@ WinNetSwitch — обязательное, отдельно устанавлив
 - Stream Deck 7.1 или новее для интерактивной проверки устройства;
 - .NET 10 SDK для разработки companion-приложения.
 
-В каталоге `stream-deck-plugin` выполните:
+В корне репозитория выполните `nvm use` на macOS/Linux, чтобы NVM прочитал `.nvmrc`; в nvm-windows выполните `nvm use 24.20.0`. Затем в каталоге `stream-deck-plugin` запустите:
 
 ```powershell
 npm ci

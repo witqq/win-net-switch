@@ -82,7 +82,7 @@ The optional plugin provides two Windows-only Stream Deck actions:
 
 The plugin is deliberately small and does **not** contain WinNetSwitch. Install and start the current [WinNetSwitch companion](https://github.com/witqq/win-net-switch/releases/latest/download/WinNetSwitch-Setup.exe) first. Then download and double-click `dev.witqq.win-net-switch.streamDeckPlugin`, approve installation in Stream Deck, and add either action to a key. `Adapter On/Off` exposes an adapter selector, a refresh control, and direct Download and Support buttons.
 
-The key title and image show the selected adapter state, the active adapter after cycling, progress, or an actionable missing-companion error. Successful changes also show a green key confirmation and a Windows tray notification. Stream Deck runs with ordinary user rights; do not launch it as administrator. WinNetSwitch keeps the required elevation and exposes only the bounded local commands to the current interactive logon session. Stream Deck 7.1 or later is required. Until the Marketplace listing is approved, install the plugin directly from the GitHub Release.
+The key title and image show the selected adapter state, the active adapter after cycling, progress, or an actionable missing-companion error. Successful changes also show a green key confirmation and a Windows tray notification. Stream Deck runs with ordinary user rights; do not launch it as administrator. WinNetSwitch keeps the required elevation and exposes only the bounded local commands to the current Windows user. Stream Deck 7.1 or later is required. Until the Marketplace listing is approved, install the plugin directly from the GitHub Release.
 
 See the complete [Stream Deck plugin and Marketplace guide](docs/STREAM_DECK.md) and [privacy policy](PRIVACY.md).
 
@@ -159,7 +159,7 @@ dotnet build .\WinNetSwitch.slnx --configuration Release --no-restore
 dotnet run --project .\tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj --configuration Release --no-restore
 ```
 
-Build and validate the plugin with Node.js 24:
+Build and validate the plugin with Node.js 24. From the repository root, run `nvm use` on macOS/Linux so NVM reads `.nvmrc`; with nvm-windows, run `nvm use 24.20.0`. Then run:
 
 ```powershell
 cd .\stream-deck-plugin

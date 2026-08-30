@@ -189,6 +189,7 @@ GitHub Actions автоматически выполняет [CI](https://github
 - [Stream Deck и публикация в Marketplace](docs/STREAM_DECK.ru.md);
 - [политика конфиденциальности](PRIVACY.ru.md);
 - [как сообщить об уязвимости](SECURITY.ru.md);
+- [политика подписи кода](CODE_SIGNING_POLICY.ru.md) и [подключение SignPath](docs/SIGNPATH_ONBOARDING.ru.md);
 - [лицензия MIT](LICENSE).
 
 ## Поддержка проекта

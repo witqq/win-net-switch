@@ -189,6 +189,7 @@ Additional documentation:
 - [Stream Deck and Marketplace guide](docs/STREAM_DECK.md);
 - [privacy policy](PRIVACY.md);
 - [security policy](SECURITY.md);
+- [code signing policy](CODE_SIGNING_POLICY.md) and [SignPath onboarding](docs/SIGNPATH_ONBOARDING.md);
 - [MIT license](LICENSE).
 
 ## Project support

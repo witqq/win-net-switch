@@ -12,7 +12,7 @@ The WinNetSwitch companion reads the following Windows network-adapter informati
 - Plug and Play device identifier when Windows requires it to re-enable a disabled physical adapter;
 - software and hardware Wi-Fi radio state.
 
-The Stream Deck plugin receives only the adapter identifier, display name, description, status, enabled state, active state, and wireless flag through a current-user-only local named pipe. Stream Deck stores the identifier of the adapter selected for an `Adapter On/Off` action as that action's local setting.
+The Stream Deck plugin receives only the adapter identifier, display name, description, status, enabled state, active state, and wireless flag through a local named pipe restricted to the current interactive Windows logon session. Stream Deck stores the identifier of the adapter selected for an `Adapter On/Off` action as that action's local setting.
 
 ## Logs
 

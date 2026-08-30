@@ -134,4 +134,5 @@ jobs:
             'artifacts\SHA256SUMS.txt#SHA-256 checksums' `
             --verify-tag `
             --generate-notes `
+            --notes "Code signing status and policy: https://github.com/witqq/win-net-switch/blob/$env:RELEASE_TAG/CODE_SIGNING_POLICY.md" `
             --title "WinNetSwitch $env:RELEASE_TAG"

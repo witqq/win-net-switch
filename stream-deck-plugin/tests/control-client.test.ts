@@ -7,7 +7,9 @@ import { after, before, test } from "node:test";
 import { WinNetSwitchClient } from "../src/control-client.ts";
 import { formatAdapterTitle, formatCycleTitle } from "../src/presentation.ts";
 
-const pipePath = join(tmpdir(), `win-net-switch-plugin-${process.pid}.sock`);
+const pipePath = process.platform === "win32"
+  ? String.raw`\\.\pipe\win-net-switch-plugin-${process.pid}`
+  : join(tmpdir(), `win-net-switch-plugin-${process.pid}.sock`);
 const requests: Record<string, unknown>[] = [];
 const adapters = [
   {

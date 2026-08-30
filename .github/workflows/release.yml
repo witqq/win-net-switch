@@ -59,6 +59,9 @@ jobs:
       - name: Test
         run: dotnet run --project .\tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj --configuration Release --no-build
 
+      - name: Native tray smoke test
+        run: dotnet run --project .\src\WinNetSwitch.App\WinNetSwitch.App.csproj --configuration Release --no-build -- --smoke-test
+
       - name: Publish application and installer
         shell: powershell
         run: .\scripts\publish.ps1

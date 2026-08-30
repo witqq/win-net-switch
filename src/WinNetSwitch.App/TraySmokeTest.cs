@@ -14,6 +14,7 @@ internal static class TraySmokeTest
         var exitCode = 1;
         var phase = 0;
         var revisionBeforeRefresh = 0;
+        var menuStayedStableUntilClose = false;
 
         timeoutTimer.Tick += (_, _) =>
         {
@@ -74,13 +75,23 @@ internal static class TraySmokeTest
 
             if (phase == 2 && !context.IsRefreshInProgress)
             {
-                var stayedStableWhileOpen = context.MenuRevision == revisionBeforeRefresh;
+                menuStayedStableUntilClose = context.MenuRevision == revisionBeforeRefresh;
                 context.EndMenuSessionForSmoke();
-                if (stayedStableWhileOpen && context.MenuRevision > revisionBeforeRefresh)
+                if (!menuStayedStableUntilClose || context.MenuRevision != revisionBeforeRefresh)
                 {
-                    exitCode = 0;
+                    context.ExitThread();
+                    return;
                 }
 
+                phase = 3;
+                return;
+            }
+
+            if (phase == 3 &&
+                menuStayedStableUntilClose &&
+                context.MenuRevision > revisionBeforeRefresh)
+            {
+                exitCode = 0;
                 context.ExitThread();
                 return;
             }

@@ -4,7 +4,7 @@ public static class InstallationPaths
 {
     public const string ApplicationName = "WinNetSwitch";
     public const string ScheduledTaskName = "WinNetSwitch";
-    public const string Version = "1.2.1";
+    public const string Version = "1.2.2";
 
     public static string InstallDirectory { get; } = Path.Combine(
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),

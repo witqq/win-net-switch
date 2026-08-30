@@ -2,6 +2,8 @@
 
 Спасибо за интерес к WinNetSwitch.
 
+Перед изменением кода проверьте [существующие Issues](https://github.com/witqq/win-net-switch/issues). Для ошибки используйте [bug report](https://github.com/witqq/win-net-switch/issues/new?template=bug_report.yml), для новой возможности — [feature request](https://github.com/witqq/win-net-switch/issues/new?template=feature_request.yml). Уязвимости не публикуйте в Issues: следуйте [политике безопасности](SECURITY.md).
+
 ## Подготовка окружения
 
 Для сборки нужны Windows 10/11 и .NET SDK версии из `global.json`. В проекте нет сторонних NuGet-зависимостей.
@@ -26,3 +28,13 @@ dotnet run --project .\tests\WinNetSwitch.Tests\WinNetSwitch.Tests.csproj --conf
 - Перед pull request выполните Release-сборку и тесты.
 
 Сообщения коммитов оформляйте в повелительном стиле с префиксом `feat:`, `fix:`, `docs:`, `test:`, `build:` или `chore:`.
+
+## Pull request
+
+1. Создайте отдельную ветку от актуальной `main`.
+2. Сделайте одно логически завершённое изменение вместе с тестами и документацией.
+3. Выполните команды проверки выше.
+4. Откройте pull request и заполните checklist шаблона.
+5. Дождитесь зелёного GitHub Actions workflow `CI`.
+
+В pull request не включайте сгенерированные `artifacts`, локальные логи и файлы окружения. Инструкция для сопровождающего по выпуску версии находится в [docs/RELEASING.md](docs/RELEASING.md).

@@ -11,6 +11,10 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private readonly ContextMenuStrip _menu = new();
     private readonly TaskCompletionSource _initialRefreshCompleted =
         new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private readonly System.Windows.Forms.Timer _deferredMenuRebuildTimer = new()
+    {
+        Interval = 1,
+    };
     private readonly Icon _trayIcon;
     private readonly NotifyIcon _notifyIcon;
     private IReadOnlyList<PhysicalNetworkAdapter> _adapters = [];
@@ -44,6 +48,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
         _menu.Opening += MenuOnOpening;
         _menu.Closed += MenuOnClosed;
+        _deferredMenuRebuildTimer.Tick += DeferredMenuRebuildTimerOnTick;
         _notifyIcon.DoubleClick += NotifyIconOnDoubleClick;
         RebuildMenu("Загрузка физических адаптеров…");
 
@@ -100,6 +105,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
             _lifetimeSource.Cancel();
             _notifyIcon.Visible = false;
             _notifyIcon.Dispose();
+            _deferredMenuRebuildTimer.Dispose();
             _menu.Dispose();
             _trayIcon.Dispose();
             (_adapterService as IDisposable)?.Dispose();
@@ -124,7 +130,16 @@ internal sealed class TrayApplicationContext : ApplicationContext
     private void CompleteMenuSession()
     {
         _menuOpen = false;
-        if (!_menuRebuildPending || _exiting)
+        if (_menuRebuildPending && !_exiting)
+        {
+            _deferredMenuRebuildTimer.Start();
+        }
+    }
+
+    private void DeferredMenuRebuildTimerOnTick(object? sender, EventArgs eventArgs)
+    {
+        _deferredMenuRebuildTimer.Stop();
+        if (_menuOpen || !_menuRebuildPending || _exiting)
         {
             return;
         }
@@ -395,7 +410,7 @@ internal sealed class TrayApplicationContext : ApplicationContext
 
     private void RequestMenuRebuild(string? status = null, bool isError = false)
     {
-        if (_menuOpen)
+        if (_menuOpen || _deferredMenuRebuildTimer.Enabled)
         {
             _menuRebuildPending = true;
             _pendingMenuStatus = status;
